@@ -142,6 +142,19 @@ services:
     networks:
       - factory-net
 
+  # ── Temporal namespace init ──────────────────────────────────
+  # Registers the 'default' namespace. Safe to re-run (already-exists is OK).
+  temporal-namespace-init:
+    image: temporalio/admin-tools:1.30.1
+    container_name: factory-temporal-namespace-init
+    restart: "no"
+    depends_on:
+      temporal:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c", "temporal operator namespace create -n default --address temporal:7233 || true"]
+    networks:
+      - factory-net
+
   # ── Temporal UI 2.34.0 ──────────────────────────────────────
   temporal-ui:
     image: temporalio/ui:2.34.0
@@ -423,8 +436,8 @@ services:
     depends_on:
       db-migrate:
         condition: service_completed_successfully
-      temporal:
-        condition: service_healthy
+      temporal-namespace-init:
+        condition: service_completed_successfully
     environment:
       TEMPORAL_ADDRESS: temporal:7233
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/factory
