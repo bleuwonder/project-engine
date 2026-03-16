@@ -1,4 +1,4 @@
-import simpleGit from 'simple-git'
+import { simpleGit } from 'simple-git'
 import { join } from 'path'
 
 const WORKSPACE = process.env.WORKSPACE_ROOT ?? join(process.cwd(), '..', '..')
