@@ -14,6 +14,7 @@
 #   8080  temporal-ui
 #   4000  litellm
 #   3001  langfuse-web  (3000 often taken)
+#   3100  dashboard
 #   9090  minio console
 #   8123  clickhouse    HTTP (direct SQL queries, debugging)
 # ============================================================
@@ -46,3 +47,7 @@ services:
   clickhouse:
     ports:
       - "127.0.0.1:8123:8123"
+
+  dashboard:
+    ports:
+      - "127.0.0.1:3100:3100"

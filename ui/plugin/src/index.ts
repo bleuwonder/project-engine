@@ -1,11 +1,5 @@
 import { Client, Connection } from '@temporalio/client'
 import type { DiscoveryState } from '@factory/types'
-import {
-  DiscoveryWorkflow,
-  userMessageSignal,
-  approvePlanSignal,
-  currentStateQuery,
-} from '../../../workers/src/workflows/index.js'
 
 let _client: Client | null = null
 
@@ -21,7 +15,7 @@ async function getClient(): Promise<Client> {
 
 export async function startProject(projectId: string): Promise<string> {
   const client = await getClient()
-  const handle = await client.workflow.start(DiscoveryWorkflow, {
+  const handle = await client.workflow.start('DiscoveryWorkflow', {
     taskQueue: 'factory',
     workflowId: `project-${projectId}-discovery`,
     args: [projectId],
@@ -31,15 +25,15 @@ export async function startProject(projectId: string): Promise<string> {
 
 export async function sendMessage(workflowId: string, message: string): Promise<void> {
   const client = await getClient()
-  await client.workflow.getHandle(workflowId).signal(userMessageSignal, message)
+  await client.workflow.getHandle(workflowId).signal('userMessage', message)
 }
 
 export async function approvePlan(workflowId: string): Promise<void> {
   const client = await getClient()
-  await client.workflow.getHandle(workflowId).signal(approvePlanSignal)
+  await client.workflow.getHandle(workflowId).signal('approvePlan')
 }
 
 export async function getState(workflowId: string): Promise<DiscoveryState> {
   const client = await getClient()
-  return client.workflow.getHandle(workflowId).query(currentStateQuery)
+  return client.workflow.getHandle(workflowId).query<DiscoveryState>('currentState')
 }

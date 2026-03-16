@@ -79,3 +79,17 @@ services:
       - "traefik.http.routers.minio-console.tls=true"
       - "traefik.http.routers.minio-console.service=minio-console-svc"
       - "traefik.http.services.minio-console-svc.loadbalancer.server.port=9090"
+
+  dashboard:
+    networks:
+      - factory-net
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      - "traefik.http.routers.factory-dashboard.rule=Host(`factory.${INTERNAL_SUBDOMAIN}.${DOMAIN}`)"
+      - "traefik.http.routers.factory-dashboard.entrypoints=websecure"
+      - "traefik.http.routers.factory-dashboard.tls=true"
+      - "traefik.http.services.factory-dashboard.loadbalancer.server.port=3100"
+    environment:
+      NEXT_PUBLIC_BASE_URL: https://factory.${INTERNAL_SUBDOMAIN}.${DOMAIN}

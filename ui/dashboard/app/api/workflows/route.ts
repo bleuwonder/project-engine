@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
+import type { DiscoveryState } from '@factory/types'
 import { getTemporalClient } from '../../lib/temporal'
-import { currentStateQuery } from '../../../../../workers/src/workflows/index'
 
 export const revalidate = 5
 
@@ -10,7 +10,7 @@ export async function GET() {
 
   for await (const wf of client.workflow.list({ query: 'ExecutionStatus="Running"' })) {
     try {
-      const state = await client.workflow.getHandle(wf.workflowId).query(currentStateQuery)
+      const state = await client.workflow.getHandle(wf.workflowId).query<DiscoveryState>('currentState')
       workflows.push({ workflowId: wf.workflowId, startTime: wf.startTime, state })
     } catch {
       // workflow may not have currentState query — skip

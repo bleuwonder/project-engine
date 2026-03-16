@@ -8,7 +8,7 @@
     "ui/dashboard"
   ],
   "scripts": {
-    "build": "npm run build --workspaces --if-present",
+    "build": "npm run build -w @factory/types && npm run build -w @factory/db && npm run build -w workers && npm run build -w @factory/dashboard",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "dev:workers": "npm run dev -w workers",
     "dev:dashboard": "npm run dev -w ui/dashboard"
