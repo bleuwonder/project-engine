@@ -62,7 +62,7 @@ export async function DiscoveryWorkflow(projectId: string): Promise<void> {
     state.conversation.push({ role: 'human', content: message, timestamp: new Date().toISOString() })
 
     const [ctx, cost] = await Promise.all([getContext(projectId), costSignal()])
-    const systemPrompt = buildPrompt(ctx)
+    const systemPrompt = await buildPrompt(ctx)
 
     const conversationText = state.conversation
       .map(m => `${m.role === 'human' ? 'Human' : 'Agent'}: ${m.content}`)
