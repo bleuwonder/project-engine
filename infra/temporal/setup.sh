@@ -18,18 +18,7 @@ set -e
 
 DB_PORT="${DB_PORT:-5432}"
 
-echo "[temporal-setup] Waiting for PostgreSQL at ${POSTGRES_SEEDS}:${DB_PORT}..."
-until temporal-sql-tool \
-  --plugin postgresql12 \
-  --endpoint "${POSTGRES_SEEDS}" \
-  --port "${DB_PORT}" \
-  --user "${POSTGRES_USER}" \
-  --password "${POSTGRES_PWD}" \
-  list 2>/dev/null; do
-  sleep 2
-done
-echo "[temporal-setup] PostgreSQL is ready."
-
+# postgres is guaranteed ready by depends_on: postgres: condition: service_healthy
 echo "[temporal-setup] Creating databases..."
 temporal-sql-tool \
   --plugin postgresql12 \
