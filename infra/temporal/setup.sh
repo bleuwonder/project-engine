@@ -21,24 +21,24 @@ DB_PORT="${DB_PORT:-5432}"
 # postgres is guaranteed ready by depends_on: postgres: condition: service_healthy
 echo "[temporal-setup] Creating databases..."
 temporal-sql-tool \
-  --plugin postgresql12 \
+  --plugin postgres12 \
   --endpoint "${POSTGRES_SEEDS}" \
   --port "${DB_PORT}" \
   --user "${POSTGRES_USER}" \
   --password "${POSTGRES_PWD}" \
-  create-database --db temporal || echo "[temporal-setup] temporal db already exists, skipping."
+  create-database temporal || echo "[temporal-setup] temporal db already exists, skipping."
 
 temporal-sql-tool \
-  --plugin postgresql12 \
+  --plugin postgres12 \
   --endpoint "${POSTGRES_SEEDS}" \
   --port "${DB_PORT}" \
   --user "${POSTGRES_USER}" \
   --password "${POSTGRES_PWD}" \
-  create-database --db temporal_visibility || echo "[temporal-setup] temporal_visibility db already exists, skipping."
+  create-database temporal_visibility || echo "[temporal-setup] temporal_visibility db already exists, skipping."
 
 echo "[temporal-setup] Setting up temporal schema..."
 temporal-sql-tool \
-  --plugin postgresql12 \
+  --plugin postgres12 \
   --endpoint "${POSTGRES_SEEDS}" \
   --port "${DB_PORT}" \
   --user "${POSTGRES_USER}" \
@@ -48,7 +48,7 @@ temporal-sql-tool \
 
 echo "[temporal-setup] Applying temporal versioned migrations..."
 temporal-sql-tool \
-  --plugin postgresql12 \
+  --plugin postgres12 \
   --endpoint "${POSTGRES_SEEDS}" \
   --port "${DB_PORT}" \
   --user "${POSTGRES_USER}" \
@@ -58,7 +58,7 @@ temporal-sql-tool \
 
 echo "[temporal-setup] Setting up temporal_visibility schema..."
 temporal-sql-tool \
-  --plugin postgresql12 \
+  --plugin postgres12 \
   --endpoint "${POSTGRES_SEEDS}" \
   --port "${DB_PORT}" \
   --user "${POSTGRES_USER}" \
@@ -68,7 +68,7 @@ temporal-sql-tool \
 
 echo "[temporal-setup] Applying temporal_visibility versioned migrations..."
 temporal-sql-tool \
-  --plugin postgresql12 \
+  --plugin postgres12 \
   --endpoint "${POSTGRES_SEEDS}" \
   --port "${DB_PORT}" \
   --user "${POSTGRES_USER}" \
