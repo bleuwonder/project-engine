@@ -10,7 +10,7 @@
 # ============================================================
 
 # ── Stage 1: install deps ────────────────────────────────────
-FROM node:22-alpine AS deps
+FROM node:22-slim AS deps
 WORKDIR /app
 
 # Copy manifests first so npm install is cached unless deps change
@@ -34,7 +34,7 @@ RUN npm run build -w @factory/types \
  && npm run build -w @factory/dashboard
 
 # ── Target: factory-migrate ──────────────────────────────────
-FROM node:22-alpine AS factory-migrate
+FROM node:22-slim AS factory-migrate
 WORKDIR /app
 
 COPY --from=builder /app/node_modules              ./node_modules
@@ -45,7 +45,7 @@ COPY --from=builder /app/packages/db               ./packages/db
 CMD ["node", "packages/db/dist/migrate.js"]
 
 # ── Target: factory-workers ──────────────────────────────────
-FROM node:22-alpine AS factory-workers
+FROM node:22-slim AS factory-workers
 WORKDIR /app
 
 COPY --from=builder /app/node_modules              ./node_modules
@@ -58,7 +58,7 @@ COPY --from=builder /app/workers                   ./workers
 CMD ["node", "workers/dist/worker.js"]
 
 # ── Target: factory-dashboard ────────────────────────────────
-FROM node:22-alpine AS factory-dashboard
+FROM node:22-slim AS factory-dashboard
 WORKDIR /app
 
 # Next.js standalone output bundles everything needed to run
