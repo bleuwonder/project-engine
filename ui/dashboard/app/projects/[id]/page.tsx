@@ -1,5 +1,7 @@
 import type { DiscoveryState } from '@factory/types'
 
+export const dynamic = 'force-dynamic'
+
 interface Props {
   params: Promise<{ id: string }>
 }

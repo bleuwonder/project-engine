@@ -1,6 +1,8 @@
 import type { DiscoveryState } from '@factory/types'
 import Link from 'next/link'
 
+export const dynamic = 'force-dynamic'
+
 interface WorkflowEntry {
   workflowId: string
   startTime: string
