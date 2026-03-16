@@ -4,19 +4,14 @@
 # Usage (replaces override.yml — do NOT load both):
 #   docker compose -f docker-compose.yml -f docker-compose.homelab.yml up -d
 #
-# What this adds:
-#   - Connects UI services to the external `proxy` Traefik network
-#   - Traefik v2 labels for automatic routing + TLS
-#   - Temporal gRPC port bound to Tailscale IP for worker access
+# All services route via the tailnet subdomain pattern:
+#   {service}.{INTERNAL_SUBDOMAIN}.{DOMAIN}
+#   e.g. langfuse.mw.bluewonder.org
 #
 # Prerequisites:
-#   - Traefik running on server1 with a Docker provider watching the `proxy` network
-#   - Set TAILSCALE_IP and domain vars in .env (or inline below)
-#   - Traefik entrypoints named `web` (80) and `websecure` (443) with your cert resolver
-#
-# Customise:
-#   TRAEFIK_CERTRESOLVER – your cert resolver name (e.g. letsencrypt, cloudflare)
-#   Replace bluewonder.org with your domain
+#   - Traefik running with cf-dns wildcard cert for *.{INTERNAL_SUBDOMAIN}.{DOMAIN}
+#   - External `proxy` network: docker network create proxy
+#   - Set TAILSCALE_IP, INTERNAL_SUBDOMAIN, DOMAIN in .env
 # ============================================================
 
 networks:
@@ -32,7 +27,6 @@ services:
       - factory-net
     ports:
       # Temporal gRPC — Tailscale-only, for workers running outside Docker
-      # Set TAILSCALE_IP in .env. Comment out if all workers run inside factory-net.
       - "${TAILSCALE_IP}:7233:7233"
 
   temporal-ui:
@@ -42,9 +36,9 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=proxy"
-      - "traefik.http.routers.temporal-ui.rule=Host(`temporal.${DOMAIN:-bluewonder.org}`)"
+      - "traefik.http.routers.temporal-ui.rule=Host(`temporal.${INTERNAL_SUBDOMAIN}.${DOMAIN}`)"
       - "traefik.http.routers.temporal-ui.entrypoints=websecure"
-      - "traefik.http.routers.temporal-ui.tls.certresolver=${TRAEFIK_CERTRESOLVER:-cf-dns}"
+      - "traefik.http.routers.temporal-ui.tls=true"
       - "traefik.http.services.temporal-ui.loadbalancer.server.port=8080"
 
   litellm:
@@ -54,9 +48,9 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=proxy"
-      - "traefik.http.routers.litellm.rule=Host(`litellm.${DOMAIN:-bluewonder.org}`)"
+      - "traefik.http.routers.litellm.rule=Host(`litellm.${INTERNAL_SUBDOMAIN}.${DOMAIN}`)"
       - "traefik.http.routers.litellm.entrypoints=websecure"
-      - "traefik.http.routers.litellm.tls.certresolver=${TRAEFIK_CERTRESOLVER:-cf-dns}"
+      - "traefik.http.routers.litellm.tls=true"
       - "traefik.http.services.litellm.loadbalancer.server.port=4000"
 
   langfuse-web:
@@ -66,13 +60,12 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=proxy"
-      - "traefik.http.routers.langfuse.rule=Host(`langfuse.${DOMAIN:-bluewonder.org}`)"
+      - "traefik.http.routers.langfuse.rule=Host(`langfuse.${INTERNAL_SUBDOMAIN}.${DOMAIN}`)"
       - "traefik.http.routers.langfuse.entrypoints=websecure"
-      - "traefik.http.routers.langfuse.tls.certresolver=${TRAEFIK_CERTRESOLVER:-cf-dns}"
+      - "traefik.http.routers.langfuse.tls=true"
       - "traefik.http.services.langfuse.loadbalancer.server.port=3000"
     environment:
-      # Update NEXTAUTH_URL to match the Traefik hostname
-      NEXTAUTH_URL: https://langfuse.${DOMAIN:-bluewonder.org}
+      NEXTAUTH_URL: https://langfuse.${INTERNAL_SUBDOMAIN}.${DOMAIN}
 
   minio:
     networks:
@@ -81,9 +74,8 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=proxy"
-      # Console UI
-      - "traefik.http.routers.minio-console.rule=Host(`minio.${DOMAIN:-bluewonder.org}`)"
+      - "traefik.http.routers.minio-console.rule=Host(`minio.${INTERNAL_SUBDOMAIN}.${DOMAIN}`)"
       - "traefik.http.routers.minio-console.entrypoints=websecure"
-      - "traefik.http.routers.minio-console.tls.certresolver=${TRAEFIK_CERTRESOLVER:-cf-dns}"
+      - "traefik.http.routers.minio-console.tls=true"
       - "traefik.http.routers.minio-console.service=minio-console-svc"
       - "traefik.http.services.minio-console-svc.loadbalancer.server.port=9090"
