@@ -1,0 +1,19 @@
+{
+  "name": "project-engine",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "workers",
+    "ui/plugin",
+    "ui/dashboard"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "dev:workers": "npm run dev -w workers",
+    "dev:dashboard": "npm run dev -w ui/dashboard"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  }
+}
