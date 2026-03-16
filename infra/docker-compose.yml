@@ -344,7 +344,7 @@ services:
       LANGFUSE_INIT_USER_NAME: ${LANGFUSE_INIT_USER_NAME:-admin}
       LANGFUSE_INIT_USER_PASSWORD: ${LANGFUSE_INIT_USER_PASSWORD}
     healthcheck:
-      test: ["CMD-SHELL", "IP=$(hostname -i | awk '{print $1}') && node -e \"require('http').get({host:'$IP',port:3000,path:'/api/public/health'},r=>{process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))\""]
+      test: ["CMD-SHELL", "IP=$(hostname -i | awk '{print $1}') && node -e \"require('http').get({host:'$$IP',port:3000,path:'/api/public/health'},r=>{process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))\""]
       interval: 15s
       timeout: 10s
       retries: 10
