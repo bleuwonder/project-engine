@@ -18,7 +18,7 @@ export async function prepareAgentContext(projectId: string): Promise<SystemCont
   return { goals, architecture, instructions, recentRuns }
 }
 
-export function buildSystemPrompt(ctx: SystemContext): string {
+export async function buildSystemPrompt(ctx: SystemContext): Promise<string> {
   return [
     '# Project Context',
     '',
