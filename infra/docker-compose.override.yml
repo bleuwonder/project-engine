@@ -1,0 +1,48 @@
+# ============================================================
+# docker-compose.override.yml — Standalone access layer
+#
+# Auto-loaded by `docker compose up`. Binds service ports to localhost
+# so you can reach them directly without a reverse proxy.
+#
+# To use homelab/Traefik mode instead:
+#   docker compose -f docker-compose.yml -f docker-compose.homelab.yml up -d
+#   (docker-compose.override.yml is NOT loaded when you specify -f explicitly)
+#
+# Port map:
+#   5433  postgres      (avoid collision with system postgres on 5432)
+#   7233  temporal      gRPC (needed if running workers outside Docker)
+#   8080  temporal-ui
+#   4000  litellm
+#   3001  langfuse-web  (3000 often taken)
+#   9090  minio console
+#   8123  clickhouse    HTTP (direct SQL queries, debugging)
+# ============================================================
+
+services:
+  postgres:
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
+
+  temporal:
+    ports:
+      - "127.0.0.1:7233:7233"
+
+  temporal-ui:
+    ports:
+      - "127.0.0.1:8080:8080"
+
+  litellm:
+    ports:
+      - "127.0.0.1:4000:4000"
+
+  langfuse-web:
+    ports:
+      - "127.0.0.1:3001:3000"
+
+  minio:
+    ports:
+      - "127.0.0.1:9090:9090"
+
+  clickhouse:
+    ports:
+      - "127.0.0.1:8123:8123"

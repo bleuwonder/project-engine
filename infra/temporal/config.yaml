@@ -1,0 +1,113 @@
+# enable-template
+# temporal/config.yaml
+# Temporal Server 1.30.1 configuration.
+# Loaded as /etc/temporal/config/development.yaml inside the container.
+#
+# sprig template variables (resolved at server startup):
+#   POSTGRES_SEEDS  – postgres hostname (docker service name: postgres)
+#   DB_PORT         – postgres port (default: 5432)
+#   POSTGRES_USER   – postgres username
+#   POSTGRES_PWD    – postgres password
+#
+# Single-node: all four roles (frontend, history, matching, worker) in one process.
+# numHistoryShards: 4 is appropriate for a single-node dev/homelab deployment.
+#   For production scale-out, this value cannot be changed after first run.
+
+log:
+  stdout: true
+  level: info
+
+persistence:
+  defaultStore: default
+  visibilityStore: visibility
+  numHistoryShards: 4
+  datastores:
+    default:
+      sql:
+        pluginName: postgresql12
+        databaseName: temporal
+        connectAddr: "{{ env "POSTGRES_SEEDS" }}:{{ env "DB_PORT" | default "5432" }}"
+        connectProtocol: tcp
+        user: "{{ env "POSTGRES_USER" }}"
+        password: "{{ env "POSTGRES_PWD" }}"
+        maxConns: 20
+        maxIdleConns: 20
+        maxConnLifetime: "1h"
+    visibility:
+      sql:
+        pluginName: postgresql12
+        databaseName: temporal_visibility
+        connectAddr: "{{ env "POSTGRES_SEEDS" }}:{{ env "DB_PORT" | default "5432" }}"
+        connectProtocol: tcp
+        user: "{{ env "POSTGRES_USER" }}"
+        password: "{{ env "POSTGRES_PWD" }}"
+        maxConns: 10
+        maxIdleConns: 10
+        maxConnLifetime: "1h"
+
+global:
+  membership:
+    maxJoinDuration: 30s
+  metrics:
+    prometheus:
+      timerType: histogram
+      listenAddress: "0.0.0.0:8000"
+
+services:
+  frontend:
+    rpc:
+      grpcPort: 7233
+      membershipPort: 6933
+      bindOnIP: "0.0.0.0"
+  matching:
+    rpc:
+      grpcPort: 7235
+      membershipPort: 6935
+      bindOnIP: "0.0.0.0"
+  history:
+    rpc:
+      grpcPort: 7234
+      membershipPort: 6934
+      bindOnIP: "0.0.0.0"
+  worker:
+    rpc:
+      grpcPort: 7239
+      membershipPort: 6939
+      bindOnIP: "0.0.0.0"
+
+clusterMetadata:
+  enableGlobalNamespace: false
+  failoverVersionIncrement: 10
+  masterClusterName: active
+  currentClusterName: active
+  clusterInformation:
+    active:
+      enabled: true
+      initialFailoverVersion: 1
+      rpcName: frontend
+      rpcAddress: "localhost:7233"
+
+dcRedirectionPolicy:
+  policy: noop
+
+archival:
+  history:
+    state: disabled
+    enableRead: false
+  visibility:
+    state: disabled
+    enableRead: false
+
+namespaceDefaults:
+  archival:
+    history:
+      state: disabled
+    visibility:
+      state: disabled
+
+publicClient:
+  hostPort: "localhost:7233"
+
+dynamicConfigClient:
+  filepath: "config/dynamicconfig/development-sql.yaml"
+  pollInterval: 10s

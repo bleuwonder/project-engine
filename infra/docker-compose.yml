@@ -4,10 +4,11 @@
 #
 # Services:
 #   postgres          – PostgreSQL 17 + pgvector 0.8.2
-#   temporal          – Temporal Server 1.29.4
-#   temporal-ui       – Temporal UI 2.47.3
+#   temporal-setup    – One-shot: creates temporal schemas (admin-tools 1.30.1)
+#   temporal          – Temporal Server 1.30.1
+#   temporal-ui       – Temporal UI 2.34.0
 #   litellm           – LiteLLM Proxy 1.82.0
-#   clickhouse        – ClickHouse 25.8 (Langfuse analytics)
+#   clickhouse        – ClickHouse 25.8 LTS (Langfuse analytics)
 #   redis             – Redis 7.2 (Langfuse queue/cache)
 #   minio             – MinIO Oct-2025 (Langfuse blob storage)
 #   minio-init        – One-shot: creates langfuse bucket
@@ -15,36 +16,31 @@
 #   langfuse-worker   – Langfuse 3.159.0 async event processor
 #
 # Version pinning rationale:
-#   pgvector 0.8.2-pg17   PG17 is current LTS; 0.8.2 fixes CVE-2026-3172 buffer overflow
-#   temporal 1.29.4       1.30.0 removed bash/curl — breaks health checks; upgrade sequentially
-#   temporal-ui 2.47.3    Pinned to match temporal server release window
-#   litellm 1.82.0        Weekly stable cycle; -stable suffix = 3-day prod validation gate
-#   langfuse 3.159.0      v3 is current (v2 EOL); web and worker tags MUST match
-#   clickhouse 25.8       LTS channel (Aug 2025 LTS); Langfuse-tested
-#   redis 7.2-alpine      Langfuse-tested minor branch; alpine reduces attack surface
-#   minio RELEASE-pinned  Never run minio:latest — breaking changes ship in patch releases
+#   pgvector 0.8.2-pg17        PG17 current LTS; 0.8.2 fixes CVE-2026-3172 buffer overflow
+#   temporal 1.30.1            1.30.x: auto-setup removed, server+admin-tools pattern required
+#   temporal-ui 2.34.0         Tested with 1.30.1 (official samples-server pairing)
+#   litellm main-1.82.0-stable Weekly stable cycle; -stable = 3-day prod validation gate
+#   langfuse 3.159.0           v3 required (v2 EOL); web and worker tags MUST match
+#   clickhouse 25.8            LTS channel (Aug 2025); Langfuse-tested
+#   redis 7.2-alpine           Langfuse-tested branch; alpine reduces attack surface
+#   minio RELEASE-pinned       Never run minio:latest — breaking changes ship in patch releases
 #
-# Networks:
-#   factory-net  – internal bridge; no external networks declared here
-#   Traefik labels and proxy network added via homelab compose override
+# Networking:
+#   factory-net is an internal bridge. NO ports are published by default.
+#   All inter-service communication uses container names as DNS.
+#   Access patterns:
+#     Standalone:    docker-compose.override.yml  (auto-loaded, binds localhost ports)
+#     Homelab:       docker-compose.homelab.yml   (Traefik labels + proxy network)
+#   Override selection:
+#     Standalone:  docker compose up -d                          (override.yml auto-loaded)
+#     Homelab:     docker compose -f docker-compose.yml -f docker-compose.homelab.yml up -d
 #
-# Port bindings:
-#   All bound to ${BIND_HOST:-127.0.0.1} — localhost-only by default.
-#   Set BIND_HOST=<TS_IP> in .env for Tailscale-direct access.
-#   Use homelab override for Traefik ingress.
-#
-# Postgres databases (single instance, three databases):
-#   factory     – project-engine data + pgvector embeddings
-#   langfuse    – Langfuse transactional data (users, projects, API keys)
-#   litellm     – LiteLLM usage logs
-#   (temporal + temporal_visibility created by auto-setup on first run)
-#
-# Startup order:
-#   postgres    → temporal, langfuse-web, langfuse-worker, litellm
-#   clickhouse  → langfuse-web, langfuse-worker
-#   redis       → langfuse-web, langfuse-worker
-#   minio       → minio-init → langfuse-web, langfuse-worker
-#   temporal    → temporal-ui
+# Postgres databases:
+#   factory              – project-engine data + pgvector embeddings
+#   langfuse             – Langfuse transactional data
+#   litellm              – LiteLLM usage logs
+#   temporal             – Temporal workflow persistence         (created by temporal-setup)
+#   temporal_visibility  – Temporal search/visibility index     (created by temporal-setup)
 # ============================================================
 
 networks:
@@ -61,11 +57,10 @@ volumes:
 services:
 
   # ── PostgreSQL 17 + pgvector 0.8.2 ─────────────────────────
-  # Hosts factory, langfuse, and litellm databases.
-  # Temporal auto-setup creates temporal + temporal_visibility on first run.
-  # Init script (postgres/init.sql) creates the remaining databases and
-  # enables the vector extension on the factory database.
-  # CRITICAL: Must run UTC. Langfuse and pgvector HNSW indexing both require it.
+  # Single instance, five databases (see above).
+  # init.sql creates factory/langfuse/litellm; temporal-setup creates temporal dbs.
+  # CRITICAL: TZ=UTC required. Langfuse ClickHouse queries and pgvector HNSW both
+  # produce wrong results with non-UTC Postgres.
   postgres:
     image: pgvector/pgvector:0.8.2-pg17
     container_name: factory-postgres
@@ -81,8 +76,6 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
-    ports:
-      - "${BIND_HOST:-127.0.0.1}:${POSTGRES_PORT:-5433}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d postgres"]
       interval: 10s
@@ -92,45 +85,66 @@ services:
     networks:
       - factory-net
 
-  # ── Temporal Server 1.29.4 ──────────────────────────────────
-  # auto-setup: bootstraps schema on first run, then runs as server.
-  # DB: postgresql12 is required for PG12+ (explicit schema vs $user search path).
-  # Upgrade path: sequential minor bumps only. See upgrade notes:
-  #   https://docs.temporal.io/self-hosted-guide/upgrade-server
-  # 1.30.0 breaking change: removed bash/curl from image — healthcheck rework needed.
-  # Do not skip to 1.30.x without testing health probes first.
+  # ── Temporal Schema Setup ───────────────────────────────────
+  # One-shot container using admin-tools image (has temporal-sql-tool + temporal CLI).
+  # Creates temporal and temporal_visibility databases, then applies versioned schema.
+  # Idempotent: safe to run on every `docker compose up`. If schema is current, exits 0.
+  # temporalio/auto-setup was removed in 1.30.x — this replaces it.
+  temporal-setup:
+    image: temporalio/admin-tools:1.30.1
+    container_name: factory-temporal-setup
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      POSTGRES_SEEDS: postgres
+      DB_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PWD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./temporal/setup.sh:/setup.sh:ro
+    entrypoint: ["/bin/sh", "/setup.sh"]
+    networks:
+      - factory-net
+
+  # ── Temporal Server 1.30.1 ──────────────────────────────────
+  # Runs all 4 roles (frontend, history, matching, worker) in one process.
+  # Config loaded from /etc/temporal/config/development.yaml (sprig-templated).
+  # Env vars used in config template: POSTGRES_SEEDS, DB_PORT, POSTGRES_USER, POSTGRES_PWD.
+  # Healthcheck: nc -z (TCP connect) — nc is available in the debian-slim base image
+  # per official temporalio/samples-server recommendation.
+  # Upgrade path: 1.30.1 → 1.30.x → 1.31.x sequential minor bumps.
+  # Schema migrations run automatically by temporal-setup before server starts.
   temporal:
-    image: temporalio/auto-setup:1.29.4
+    image: temporalio/server:1.30.1
     container_name: factory-temporal
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
     depends_on:
-      postgres:
-        condition: service_healthy
+      temporal-setup:
+        condition: service_completed_successfully
     environment:
-      DB: postgresql12
+      POSTGRES_SEEDS: postgres
       DB_PORT: 5432
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PWD: ${POSTGRES_PASSWORD}
-      POSTGRES_SEEDS: postgres
-      DYNAMIC_CONFIG_FILE_PATH: config/dynamicconfig/development-sql.yaml
-    ports:
-      - "${BIND_HOST:-127.0.0.1}:7233:7233"
     volumes:
+      - ./temporal/config.yaml:/etc/temporal/config/development.yaml:ro
       - ./temporal/dynamicconfig:/etc/temporal/config/dynamicconfig:ro
     healthcheck:
-      test: ["CMD", "tctl", "--address", "temporal:7233", "cluster", "health"]
-      interval: 15s
-      timeout: 10s
-      retries: 10
-      start_period: 60s
+      test: ["CMD", "nc", "-z", "localhost", "7233"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
     networks:
       - factory-net
 
-  # ── Temporal UI 2.47.3 ──────────────────────────────────────
+  # ── Temporal UI 2.34.0 ──────────────────────────────────────
   temporal-ui:
-    image: temporalio/ui:2.47.3
+    image: temporalio/ui:2.34.0
     container_name: factory-temporal-ui
     restart: unless-stopped
     security_opt:
@@ -142,18 +156,14 @@ services:
       TEMPORAL_ADDRESS: temporal:7233
       TEMPORAL_CORS_ORIGINS: ${TEMPORAL_CORS_ORIGINS:-http://localhost:8080}
       TEMPORAL_PERMIT_WRITE_API: "true"
-    ports:
-      - "${BIND_HOST:-127.0.0.1}:8080:8080"
     networks:
       - factory-net
 
   # ── LiteLLM Proxy 1.82.0 ────────────────────────────────────
-  # LLM gateway: model routing, cost tracking, failover, semantic caching.
-  # Config: ./litellm-config.yaml (model definitions + Langfuse callback).
-  # DATABASE_URL: stores usage logs in litellm db (cost tracking per model/key).
-  # LANGFUSE_PUBLIC_KEY / SECRET_KEY: obtained from Langfuse UI after first login.
-  #   Create a project in Langfuse, go to Settings → API Keys, add them to .env.
-  # Update cadence: weekly stable releases — bump version tag, test, commit.
+  # LLM gateway: model routing, cost tracking, semantic caching.
+  # LANGFUSE_PUBLIC_KEY / SECRET_KEY: create in Langfuse UI after first login.
+  #   Settings → Projects → API Keys → Create → add to .env → restart litellm.
+  # STORE_MODEL_IN_DB: allows adding models via UI without config file changes.
   litellm:
     image: ghcr.io/berriai/litellm:main-1.82.0-stable
     container_name: factory-litellm
@@ -173,8 +183,6 @@ services:
       STORE_MODEL_IN_DB: "true"
     volumes:
       - ./litellm-config.yaml:/app/config.yaml:ro
-    ports:
-      - "${BIND_HOST:-127.0.0.1}:4000:4000"
     command: ["--config", "/app/config.yaml", "--port", "4000"]
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:4000/health/liveliness || exit 1"]
@@ -185,10 +193,10 @@ services:
     networks:
       - factory-net
 
-  # ── ClickHouse 25.8 ─────────────────────────────────────────
-  # Langfuse v3 moved all trace/observation/score data here.
-  # LTS release channel: 24.3, 24.8, 25.3, 25.8 — always upgrade LTS-to-LTS.
-  # CRITICAL: Must run UTC. Non-UTC produces incorrect/empty query results.
+  # ── ClickHouse 25.8 LTS ─────────────────────────────────────
+  # Langfuse v3 stores all traces/observations/scores here (moved from Postgres for scale).
+  # LTS release channel: upgrade LTS-to-LTS only (24.3 → 24.8 → 25.3 → 25.8).
+  # CRITICAL: TZ=UTC. Non-UTC produces incorrect/empty Langfuse query results.
   clickhouse:
     image: clickhouse/clickhouse-server:25.8
     container_name: factory-clickhouse
@@ -204,9 +212,6 @@ services:
     volumes:
       - clickhouse-data:/var/lib/clickhouse
       - clickhouse-logs:/var/log/clickhouse-server
-    ports:
-      - "${BIND_HOST:-127.0.0.1}:8123:8123"
-      - "${BIND_HOST:-127.0.0.1}:9000:9000"
     healthcheck:
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1"]
       interval: 10s
@@ -217,8 +222,8 @@ services:
       - factory-net
 
   # ── Redis 7.2 ───────────────────────────────────────────────
-  # Langfuse uses Redis for async event queue and rate-limit cache.
-  # Password passed via environment so healthcheck can auth without a config file.
+  # Langfuse: async event queue + rate-limit cache.
+  # LiteLLM: semantic caching (see litellm-config.yaml).
   redis:
     image: redis:7.2-alpine
     container_name: factory-redis
@@ -232,7 +237,7 @@ services:
       --requirepass ${REDIS_PASSWORD}
       --save 60 1
       --loglevel warning
-      --maxmemory 256mb
+      --maxmemory 512mb
       --maxmemory-policy allkeys-lru
     volumes:
       - redis-data:/data
@@ -246,10 +251,9 @@ services:
 
   # ── MinIO ───────────────────────────────────────────────────
   # S3-compatible blob storage for Langfuse raw event uploads and attachments.
+  # API on internal port 9000 only. Console only exposed via overrides.
   # NEVER use minio:latest — breaking changes ship in patch releases.
-  # To update: check https://github.com/minio/minio/releases, bump both
-  # minio and mc tags together, test bucket access before promoting.
-  # API: port 9000 (internal), Console UI: port 9090
+  # Update: bump both minio + mc tags together. Check: https://github.com/minio/minio/releases
   minio:
     image: minio/minio:RELEASE.2025-10-15T17-29-55Z
     container_name: factory-minio
@@ -261,11 +265,9 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     volumes:
       - minio-data:/data
-    ports:
-      - "${BIND_HOST:-127.0.0.1}:9090:9090"
     command: server /data --address ":9000" --console-address ":9090"
     healthcheck:
-      test: ["CMD-SHELL", "mc ready local 2>/dev/null || curl -sf http://localhost:9000/minio/health/live"]
+      test: ["CMD-SHELL", "curl -sf http://localhost:9000/minio/health/live || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -274,9 +276,7 @@ services:
       - factory-net
 
   # ── MinIO init ──────────────────────────────────────────────
-  # One-shot container. Creates the langfuse bucket on first run then exits.
-  # Safe to run on every `docker compose up` — mc mb --ignore-existing is idempotent.
-  # Uses latest mc client — one-shot, no persistent exposure, acceptable risk.
+  # One-shot: creates the langfuse bucket. mc mb --ignore-existing is idempotent.
   minio-init:
     image: minio/mc:latest
     container_name: factory-minio-init
@@ -298,11 +298,9 @@ services:
 
   # ── Langfuse Web 3.159.0 ────────────────────────────────────
   # LLM observability: traces, prompts, evaluations, costs.
-  # v3 requires ClickHouse (analytics), Redis (queue), MinIO (blobs), Postgres (transactional).
-  # LANGFUSE_INIT_* vars seed the first org/project/user on first startup (idempotent).
-  #   After first run, create API keys in the UI → add to .env → restart litellm to pick them up.
-  # ENCRYPTION_KEY: 64-char hex (openssl rand -hex 32). Encrypts stored API keys at rest.
-  # CRITICAL: TZ is inherited from system; Postgres must be UTC (set above).
+  # v3 requires: ClickHouse (analytics) + Redis (queue) + MinIO (blobs) + Postgres (transactional).
+  # LANGFUSE_INIT_* seeds org/project/user on first run (idempotent).
+  # ENCRYPTION_KEY encrypts stored API keys at rest — back this up, loss = lost API keys.
   langfuse-web:
     image: langfuse/langfuse:3.159.0
     container_name: factory-langfuse-web
@@ -344,8 +342,6 @@ services:
       LANGFUSE_INIT_USER_EMAIL: ${LANGFUSE_INIT_USER_EMAIL}
       LANGFUSE_INIT_USER_NAME: ${LANGFUSE_INIT_USER_NAME:-admin}
       LANGFUSE_INIT_USER_PASSWORD: ${LANGFUSE_INIT_USER_PASSWORD}
-    ports:
-      - "${BIND_HOST:-127.0.0.1}:3001:3000"
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/public/health || exit 1"]
       interval: 15s
@@ -356,9 +352,8 @@ services:
       - factory-net
 
   # ── Langfuse Worker 3.159.0 ─────────────────────────────────
-  # Separate image from langfuse-web. Processes async tasks: trace ingestion,
-  # score calculation, dataset runs, scheduled exports.
-  # Tag MUST match langfuse-web — they share the same schema version.
+  # Separate image. Processes async tasks: trace ingestion, scoring, dataset runs.
+  # Tag MUST match langfuse-web — shared schema version.
   langfuse-worker:
     image: langfuse/langfuse-worker:3.159.0
     container_name: factory-langfuse-worker
