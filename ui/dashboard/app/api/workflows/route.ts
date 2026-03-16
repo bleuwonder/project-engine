@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import type { DiscoveryState } from '@factory/types'
 import { getTemporalClient } from '../../lib/temporal'
 
-export const revalidate = 5
+export const dynamic = 'force-dynamic'
 
 export async function GET() {
   const client = await getTemporalClient()

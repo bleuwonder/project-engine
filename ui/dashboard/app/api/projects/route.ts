@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import postgres from 'postgres'
 
-export const revalidate = 5
+export const dynamic = 'force-dynamic'
 
 const sql = postgres(process.env.DATABASE_URL!)
 
