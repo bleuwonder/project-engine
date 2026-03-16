@@ -44,7 +44,7 @@ services:
       - "traefik.docker.network=proxy"
       - "traefik.http.routers.temporal-ui.rule=Host(`temporal.${DOMAIN:-bluewonder.org}`)"
       - "traefik.http.routers.temporal-ui.entrypoints=websecure"
-      - "traefik.http.routers.temporal-ui.tls.certresolver=${TRAEFIK_CERTRESOLVER:-letsencrypt}"
+      - "traefik.http.routers.temporal-ui.tls.certresolver=${TRAEFIK_CERTRESOLVER:-cf-dns}"
       - "traefik.http.services.temporal-ui.loadbalancer.server.port=8080"
 
   litellm:
@@ -56,7 +56,7 @@ services:
       - "traefik.docker.network=proxy"
       - "traefik.http.routers.litellm.rule=Host(`litellm.${DOMAIN:-bluewonder.org}`)"
       - "traefik.http.routers.litellm.entrypoints=websecure"
-      - "traefik.http.routers.litellm.tls.certresolver=${TRAEFIK_CERTRESOLVER:-letsencrypt}"
+      - "traefik.http.routers.litellm.tls.certresolver=${TRAEFIK_CERTRESOLVER:-cf-dns}"
       - "traefik.http.services.litellm.loadbalancer.server.port=4000"
 
   langfuse-web:
@@ -68,7 +68,7 @@ services:
       - "traefik.docker.network=proxy"
       - "traefik.http.routers.langfuse.rule=Host(`langfuse.${DOMAIN:-bluewonder.org}`)"
       - "traefik.http.routers.langfuse.entrypoints=websecure"
-      - "traefik.http.routers.langfuse.tls.certresolver=${TRAEFIK_CERTRESOLVER:-letsencrypt}"
+      - "traefik.http.routers.langfuse.tls.certresolver=${TRAEFIK_CERTRESOLVER:-cf-dns}"
       - "traefik.http.services.langfuse.loadbalancer.server.port=3000"
     environment:
       # Update NEXTAUTH_URL to match the Traefik hostname
@@ -84,6 +84,6 @@ services:
       # Console UI
       - "traefik.http.routers.minio-console.rule=Host(`minio.${DOMAIN:-bluewonder.org}`)"
       - "traefik.http.routers.minio-console.entrypoints=websecure"
-      - "traefik.http.routers.minio-console.tls.certresolver=${TRAEFIK_CERTRESOLVER:-letsencrypt}"
+      - "traefik.http.routers.minio-console.tls.certresolver=${TRAEFIK_CERTRESOLVER:-cf-dns}"
       - "traefik.http.routers.minio-console.service=minio-console-svc"
       - "traefik.http.services.minio-console-svc.loadbalancer.server.port=9090"
