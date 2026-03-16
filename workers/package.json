@@ -17,7 +17,9 @@
     "@temporalio/client": "^1.11.5",
     "@temporalio/worker": "^1.11.5",
     "@temporalio/workflow": "^1.11.5",
-    "openai": "^4.86.2"
+    "openai": "^4.86.2",
+    "@octokit/rest": "^21.0.2",
+    "simple-git": "^3.27.0"
   },
   "devDependencies": {
     "tsx": "^4.19.2",

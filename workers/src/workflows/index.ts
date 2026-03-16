@@ -1,1 +1,5 @@
 export { DiscoveryWorkflow, userMessageSignal, approvePlanSignal, currentStateQuery } from './discovery.js'
+export { planningWorkflow } from './planning.js'
+export { codingWorkflow } from './coding.js'
+export { reviewWorkflow } from './review.js'
+export { mergeWorkflow } from './merge.js'

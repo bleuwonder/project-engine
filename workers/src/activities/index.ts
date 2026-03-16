@@ -4,3 +4,6 @@ export { readProjectFile, writeProjectFile, writeRunFile, readRecentRuns } from 
 export { prepareAgentContext, buildSystemPrompt } from './context.js'
 export { checkMetricsGate } from './metrics-gate.js'
 export { upsertProject, insertRun } from './db-writes.js'
+export { gitCreateBranch, gitCheckoutMain, gitCommitFiles, gitPushBranch, gitCurrentBranch } from './git-ops.js'
+export { createPullRequest, mergePullRequest } from './github.js'
+export { runTestSuite } from './test-runner.js'

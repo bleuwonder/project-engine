@@ -443,9 +443,12 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/factory
       LITELLM_URL: http://litellm:4000
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY}
-      PROJECTS_ROOT: /projects
+      WORKSPACE_ROOT: /workspace
+      PROJECTS_ROOT: /workspace/projects
+      GITHUB_TOKEN: ${GITHUB_TOKEN}
+      GITHUB_REPO: ${GITHUB_REPO:-bleuwonder/project-engine}
     volumes:
-      - ../projects:/projects
+      - ..:/workspace:rw
     networks:
       - factory-net
 
