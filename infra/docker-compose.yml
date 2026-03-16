@@ -126,13 +126,13 @@ services:
       temporal-setup:
         condition: service_completed_successfully
     environment:
+      DB: postgres12
       POSTGRES_SEEDS: postgres
       DB_PORT: 5432
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PWD: ${POSTGRES_PASSWORD}
     volumes:
-      - ./temporal/config.yaml:/etc/temporal/config/development.yaml:ro
-      - ./temporal/dynamicconfig:/etc/temporal/config/dynamicconfig:ro
+      - ./temporal/dynamicconfig/development-sql.yaml:/etc/temporal/config/dynamicconfig/docker.yaml:ro
     healthcheck:
       test: ["CMD", "nc", "-z", "localhost", "7233"]
       interval: 10s
