@@ -19,7 +19,7 @@
 #   pgvector 0.8.2-pg17        PG17 current LTS; 0.8.2 fixes CVE-2026-3172 buffer overflow
 #   temporal 1.30.1            1.30.x: auto-setup removed, server+admin-tools pattern required
 #   temporal-ui 2.34.0         Tested with 1.30.1 (official samples-server pairing)
-#   litellm main-1.82.0-stable Weekly stable cycle; -stable = 3-day prod validation gate
+#   litellm main-v1.82.0-stable  Weekly stable cycle; pinned tag format: main-v{version}-stable
 #   langfuse 3.159.0           v3 required (v2 EOL); web and worker tags MUST match
 #   clickhouse 25.8            LTS channel (Aug 2025); Langfuse-tested
 #   redis 7.2-alpine           Langfuse-tested branch; alpine reduces attack surface
@@ -165,7 +165,7 @@ services:
   #   Settings → Projects → API Keys → Create → add to .env → restart litellm.
   # STORE_MODEL_IN_DB: allows adding models via UI without config file changes.
   litellm:
-    image: ghcr.io/berriai/litellm:main-1.82.0-stable
+    image: ghcr.io/berriai/litellm:main-v1.82.0-stable
     container_name: factory-litellm
     restart: unless-stopped
     security_opt:
