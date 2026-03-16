@@ -1,0 +1,17 @@
+# temporal/dynamicconfig/development-sql.yaml
+# Temporal dynamic configuration for SQL (PostgreSQL) persistence.
+# Loaded at runtime — changes take effect without restart.
+# Full reference: https://docs.temporal.io/references/dynamic-configuration
+
+system.enableVisibilityToKafka:
+  - value: false
+    constraints: {}
+
+limit.maxIDLength:
+  - value: 255
+    constraints: {}
+
+# Increase for high-concurrency workloads. Default is conservative.
+frontend.rps:
+  - value: 2400
+    constraints: {}

@@ -1,0 +1,58 @@
+# infra/litellm-config.yaml
+# LiteLLM Proxy — model routing, cost tracking, failover.
+#
+# Model aliases used in workers/src/activities/llm.ts:
+#   claude-opus    → anthropic/claude-opus-4-5   (complex tasks, never compromise)
+#   claude-sonnet  → anthropic/claude-sonnet-4-5  (balanced, safe default)
+#   claude-haiku   → anthropic/claude-3-5-haiku-20241022  (simple + meta-calls)
+#
+# Routing logic lives in code (workers/src/activities/llm.ts), not here.
+# This file configures the gateway; code decides which alias to call.
+#
+# Langfuse callback: wired once LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY
+# are set in .env (after first Langfuse login → Settings → API Keys).
+# Until then, LiteLLM operates without observability — set the keys before
+# running production workloads.
+#
+# To update models: change the `model:` values below. Aliases in code stay stable.
+# Check current model IDs: https://docs.anthropic.com/en/docs/models-overview
+
+model_list:
+
+  - model_name: claude-opus
+    litellm_params:
+      model: anthropic/claude-opus-4-5
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  - model_name: claude-sonnet
+    litellm_params:
+      model: anthropic/claude-sonnet-4-5
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  - model_name: claude-haiku
+    litellm_params:
+      model: anthropic/claude-3-5-haiku-20241022
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  database_url: os.environ/DATABASE_URL
+
+  # Semantic caching: returns cached response for semantically similar prompts.
+  # Reduces cost on repeated/similar agent calls. Disable if determinism required.
+  cache: true
+  cache_params:
+    type: redis
+    redis_connection_string: redis://:os.environ/REDIS_PASSWORD@redis:6379
+
+litellm_settings:
+  # Drop unknown params silently rather than erroring (safer across model versions).
+  drop_params: true
+
+  # Langfuse observability. Keys set via environment variables.
+  # Traces will appear in Langfuse under the project configured in LANGFUSE_INIT_PROJECT_NAME.
+  success_callback: ["langfuse"]
+  failure_callback: ["langfuse"]
+  langfuse_public_key: os.environ/LANGFUSE_PUBLIC_KEY
+  langfuse_secret_key: os.environ/LANGFUSE_SECRET_KEY
+  langfuse_host: http://langfuse-web:3000
