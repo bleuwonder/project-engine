@@ -447,8 +447,10 @@ services:
       PROJECTS_ROOT: /workspace/projects
       GITHUB_TOKEN: ${GITHUB_TOKEN}
       GITHUB_REPO: ${GITHUB_REPO:-bleuwonder/project-engine}
+      CLAUDE_MODEL: ${CLAUDE_MODEL:-claude-sonnet-4-5}
     volumes:
       - ..:/workspace:rw
+      - ~/.claude:/root/.claude:ro
     networks:
       - factory-net
 

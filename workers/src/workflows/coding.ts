@@ -1,25 +1,12 @@
 import * as workflow from '@temporalio/workflow'
+import { join } from 'path'
 import type { CodingState, TaskItem } from '@factory/types'
-import type { prepareAgentContext, buildSystemPrompt } from '../activities/context.js'
-import type { routeToModel } from '../activities/llm.js'
-import type { getCostSignal } from '../activities/cost-oracle.js'
 import type { checkMetricsGate } from '../activities/metrics-gate.js'
-import type { writeRunFile, writeProjectFile } from '../activities/git.js'
+import type { writeRunFile } from '../activities/git.js'
 import type { upsertProject, insertRun } from '../activities/db-writes.js'
 import type { gitCreateBranch, gitCommitFiles, gitPushBranch } from '../activities/git-ops.js'
 import type { runTestSuite } from '../activities/test-runner.js'
-
-const { prepareAgentContext: getContext, buildSystemPrompt: buildPrompt } =
-  workflow.proxyActivities<{
-    prepareAgentContext: typeof prepareAgentContext
-    buildSystemPrompt: typeof buildSystemPrompt
-  }>({ startToCloseTimeout: '30s' })
-
-const { routeToModel: llm, getCostSignal: costSignal } =
-  workflow.proxyActivities<{
-    routeToModel: typeof routeToModel
-    getCostSignal: typeof getCostSignal
-  }>({ startToCloseTimeout: '5m' })
+import type { claudeCodingAgent } from '../activities/claude-agent.js'
 
 const { checkMetricsGate: metricsGate } =
   workflow.proxyActivities<{ checkMetricsGate: typeof checkMetricsGate }>({
@@ -27,11 +14,10 @@ const { checkMetricsGate: metricsGate } =
     retry: { maximumAttempts: 1 },
   })
 
-const { writeRunFile: writeRun, writeProjectFile: writeFile } =
-  workflow.proxyActivities<{
-    writeRunFile: typeof writeRunFile
-    writeProjectFile: typeof writeProjectFile
-  }>({ startToCloseTimeout: '30s' })
+const { writeRunFile: writeRun } =
+  workflow.proxyActivities<{ writeRunFile: typeof writeRunFile }>({
+    startToCloseTimeout: '30s',
+  })
 
 const { upsertProject: dbUpsertProject, insertRun: dbInsertRun } =
   workflow.proxyActivities<{
@@ -49,6 +35,12 @@ const { gitCreateBranch: createBranch, gitCommitFiles: commitFiles, gitPushBranc
 const { runTestSuite: runTests } =
   workflow.proxyActivities<{ runTestSuite: typeof runTestSuite }>({
     startToCloseTimeout: '3m',
+  })
+
+const { claudeCodingAgent: runCodingAgent } =
+  workflow.proxyActivities<{ claudeCodingAgent: typeof claudeCodingAgent }>({
+    startToCloseTimeout: '10m',
+    retry: { maximumAttempts: 2 },
   })
 
 export const currentStateQuery = workflow.defineQuery<CodingState>('currentState')
@@ -75,94 +67,46 @@ export async function codingWorkflow(projectId: string, tasks: TaskItem[]): Prom
 
   await createBranch(branchName)
 
+  const projectsRoot = process.env.PROJECTS_ROOT ?? '/workspace/projects'
+  const projectDir = join(projectsRoot, projectId)
+
   let agentsCompleted = 0
   let agentsFailed = 0
   const failedAgents: Array<{ agentId: string; task: string; reason: string; retriesExhausted: boolean }> = []
 
-  // Run each task sequentially
   for (let i = 0; i < state.tasks.length; i++) {
     state.currentTaskIndex = i
     const task = state.tasks[i]
     state.tasks[i] = { ...task, status: 'in_progress' }
 
-    const [ctx, cost] = await Promise.all([getContext(projectId), costSignal()])
-    const systemPrompt = await buildPrompt(ctx)
+    try {
+      // Claude Code agent writes files directly — no parsing needed
+      const summary = await runCodingAgent(projectDir, task.description, task.outputFiles)
+      state.tasks[i] = { ...state.tasks[i], status: 'done', agentOutput: summary }
 
-    let taskPassed = false
-    let lastError = ''
-
-    // Up to 3 attempts per task (retry with error feedback)
-    for (let attempt = 0; attempt < 3; attempt++) {
-      const prompt = attempt === 0
-        ? [
-            `Implement the following coding task for project ${projectId}:`,
-            '',
-            `Task: ${task.description}`,
-            `Requirements: ${task.requirements}`,
-            `Output file(s): ${task.outputFiles.join(', ')}`,
-            '',
-            'Output ONLY the file content. No explanations. If multiple files, separate each with:',
-            '===FILE: path/to/file.ts===',
-            '[file content]',
-          ].join('\n')
-        : [
-            `Previous attempt failed with error:`,
-            lastError,
-            '',
-            `Fix the implementation for: ${task.description}`,
-            `Output file(s): ${task.outputFiles.join(', ')}`,
-          ].join('\n')
-
-      const code = await llm(prompt, 'code', 'medium', cost, systemPrompt)
-
-      // Parse and write output files
-      if (task.outputFiles.length === 1) {
-        await writeFile(projectId, task.outputFiles[0], code)
-      } else {
-        // Multi-file response: split on ===FILE: path=== markers
-        const fileBlocks = code.split(/===FILE:\s*(.+?)===/)
-        for (let j = 1; j < fileBlocks.length; j += 2) {
-          const filePath = fileBlocks[j].trim()
-          const fileContent = fileBlocks[j + 1]?.trim() ?? ''
-          if (filePath && fileContent) {
-            await writeFile(projectId, filePath, fileContent)
-          }
-        }
-      }
-
-      const commitMsg = `feat(${projectId}): ${task.description} [task ${i + 1}/${state.tasks.length}]`
+      const commitMsg = `feat(${projectId}): ${task.description} [${i + 1}/${state.tasks.length}]`
       const filePaths = task.outputFiles.map(f => `projects/${projectId}/${f}`)
       await commitFiles(commitMsg, filePaths)
 
-      // Run tests after each task
-      const testResult = await runTests(projectId)
-      state.testOutput = testResult.output
-
-      if (testResult.passed) {
-        taskPassed = true
-        break
-      }
-      lastError = testResult.output.slice(-2000)
-    }
-
-    if (taskPassed) {
-      state.tasks[i] = { ...state.tasks[i], status: 'done' }
       agentsCompleted++
-    } else {
+    } catch (err) {
+      const reason = err instanceof Error ? err.message.slice(0, 500) : String(err)
       state.tasks[i] = { ...state.tasks[i], status: 'failed' }
       agentsFailed++
       failedAgents.push({
         agentId: `task-${task.id}`,
         task: task.description,
-        reason: `Tests failed after 3 attempts: ${lastError.slice(0, 500)}`,
+        reason,
         retriesExhausted: true,
       })
     }
   }
 
-  state.testsPassed = agentsFailed === 0
+  // Run test suite after all tasks
+  const testResult = await runTests(projectId)
+  state.testsPassed = testResult.passed
+  state.testOutput = testResult.output
 
-  // Push branch
   await pushBranch(branchName)
 
   const runStatus = agentsFailed === 0 ? 'complete' as const

@@ -47,6 +47,7 @@ CMD ["node", "packages/db/dist/migrate.js"]
 # ── Target: factory-workers ──────────────────────────────────
 FROM node:22-slim AS factory-workers
 RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
+RUN npm install -g @anthropic-ai/claude-code --quiet
 WORKDIR /app
 
 COPY --from=builder /app/node_modules              ./node_modules
@@ -54,8 +55,8 @@ COPY --from=builder /app/packages/types            ./packages/types
 COPY --from=builder /app/packages/db               ./packages/db
 COPY --from=builder /app/workers                   ./workers
 
-# projects/ is mounted at runtime as a bind volume
-# Required env: TEMPORAL_ADDRESS, DATABASE_URL, LITELLM_URL, LITELLM_MASTER_KEY
+# ~/.claude/ mounted at runtime with host credentials (Max plan auth)
+# Required env: TEMPORAL_ADDRESS, DATABASE_URL, WORKSPACE_ROOT
 CMD ["node", "workers/dist/worker.js"]
 
 # ── Target: factory-dashboard ────────────────────────────────
