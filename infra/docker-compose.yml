@@ -447,13 +447,15 @@ services:
       PROJECTS_ROOT: /workspace/projects
       GITHUB_TOKEN: ${GITHUB_TOKEN}
       GITHUB_REPO: ${GITHUB_REPO:-bleuwonder/project-engine}
-      # LLM_BACKEND=claude  → claude CLI + ~/.claude/ (Max plan, no API key needed)
+      # LLM_BACKEND=claude  → claude CLI + CLAUDE_CODE_OAUTH_TOKEN (Max plan, no API key needed)
       # LLM_BACKEND=litellm → LiteLLM proxy + ANTHROPIC_API_KEY
       LLM_BACKEND: ${LLM_BACKEND:-litellm}
       CLAUDE_MODEL: ${CLAUDE_MODEL:-claude-sonnet-4-5}
+      # Max plan auth: generate once with `claude setup-token` on a browser-capable machine
+      # Token is valid 1 year. Add CLAUDE_CODE_OAUTH_TOKEN to /opt/project-engine/infra/.env
+      CLAUDE_CODE_OAUTH_TOKEN: ${CLAUDE_CODE_OAUTH_TOKEN:-}
     volumes:
       - ..:/workspace:rw
-      - ~/.claude:/root/.claude:ro
     networks:
       - factory-net
 
