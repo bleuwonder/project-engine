@@ -9,6 +9,7 @@ const execFileAsync = promisify(execFile)
 const DEFAULT_MODEL = process.env.CLAUDE_MODEL ?? 'claude-sonnet-4-5'
 const CLAUDE_BIN = process.env.CLAUDE_BIN ?? 'claude'
 export const BACKEND = (process.env.LLM_BACKEND ?? 'litellm') as 'claude' | 'litellm'
+const PROJECTS_ROOT = process.env.PROJECTS_ROOT ?? '/workspace/projects'
 
 // ── Claude CLI backend ────────────────────────────────────────
 
