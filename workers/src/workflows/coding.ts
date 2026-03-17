@@ -1,5 +1,4 @@
 import * as workflow from '@temporalio/workflow'
-import { join } from 'path'
 import type { CodingState, TaskItem } from '@factory/types'
 import type { checkMetricsGate } from '../activities/metrics-gate.js'
 import type { writeRunFile } from '../activities/git.js'
@@ -67,8 +66,6 @@ export async function codingWorkflow(projectId: string, tasks: TaskItem[]): Prom
 
   await createBranch(branchName)
 
-  const projectsRoot = process.env.PROJECTS_ROOT ?? '/workspace/projects'
-  const projectDir = join(projectsRoot, projectId)
 
   let agentsCompleted = 0
   let agentsFailed = 0
@@ -81,7 +78,7 @@ export async function codingWorkflow(projectId: string, tasks: TaskItem[]): Prom
 
     try {
       // Claude Code agent writes files directly — no parsing needed
-      const summary = await runCodingAgent(projectDir, task.description, task.outputFiles)
+      const summary = await runCodingAgent(projectId, task.description, task.outputFiles)
       state.tasks[i] = { ...state.tasks[i], status: 'done', agentOutput: summary }
 
       const commitMsg = `feat(${projectId}): ${task.description} [${i + 1}/${state.tasks.length}]`

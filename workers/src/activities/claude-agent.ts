@@ -1,4 +1,4 @@
-import { execFile, execFileSync } from 'child_process'
+import { execFile } from 'child_process'
 import { promisify } from 'util'
 import { writeFileSync, mkdirSync } from 'fs'
 import { join, dirname } from 'path'
@@ -35,7 +35,8 @@ export async function claudePrompt(
 }
 
 // Full coding agent — claude CLI uses Read/Edit/Bash tools to write files directly
-async function claudeCliCodingAgent(workDir: string, task: string, outputFiles: string[]): Promise<string> {
+async function claudeCliCodingAgent(projectId: string, task: string, outputFiles: string[]): Promise<string> {
+  const workDir = join(PROJECTS_ROOT, projectId)
   const prompt = [
     `Implement the following coding task. Work directly in: ${workDir}`,
     `Task: ${task}`,
@@ -75,7 +76,8 @@ function litellm(): OpenAI {
 }
 
 // LiteLLM coding: LLM generates code as text, we parse and write files
-async function litellmCodingAgent(workDir: string, task: string, outputFiles: string[]): Promise<string> {
+async function litellmCodingAgent(projectId: string, task: string, outputFiles: string[]): Promise<string> {
+  const workDir = join(PROJECTS_ROOT, projectId)
   const isSingle = outputFiles.length === 1
   const prompt = isSingle
     ? [
@@ -122,10 +124,10 @@ async function litellmCodingAgent(workDir: string, task: string, outputFiles: st
 // ── Public entrypoint (backend-agnostic) ─────────────────────
 
 export async function claudeCodingAgent(
-  workDir: string,
+  projectId: string,
   task: string,
   outputFiles: string[],
 ): Promise<string> {
-  if (BACKEND === 'claude') return claudeCliCodingAgent(workDir, task, outputFiles)
-  return litellmCodingAgent(workDir, task, outputFiles)
+  if (BACKEND === 'claude') return claudeCliCodingAgent(projectId, task, outputFiles)
+  return litellmCodingAgent(projectId, task, outputFiles)
 }
