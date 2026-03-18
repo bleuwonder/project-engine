@@ -2,30 +2,48 @@
 # LiteLLM Proxy — model routing, cost tracking, failover.
 #
 # Model aliases used in workers/src/activities/llm.ts:
-#   codex          → openai/codex-mini-latest     (code generation tasks)
-#   claude-opus    → anthropic/claude-opus-4-5    (complex tasks, never compromise)
-#   claude-sonnet  → anthropic/claude-sonnet-4-5  (balanced, safe default)
-#   claude-haiku   → anthropic/claude-3-5-haiku-20241022  (simple + meta-calls)
+#   codex          → chatgpt/gpt-5.3-codex        (code gen — ChatGPT subscription, no API cost)
+#   gpt-large      → chatgpt/gpt-5.4              (general large — ChatGPT subscription)
+#   gpt-small      → chatgpt/gpt-5.3-instant      (fast/cheap — ChatGPT subscription)
+#   claude-opus    → anthropic/claude-opus-4-5    (complex tasks — Anthropic API key)
+#   claude-sonnet  → anthropic/claude-sonnet-4-5  (balanced — Anthropic API key)
+#   claude-haiku   → anthropic/claude-3-5-haiku-20241022  (simple + meta — Anthropic API key)
+#
+# ChatGPT subscription auth (one-time setup):
+#   1. Start the stack: docker compose up -d
+#   2. Hit any chatgpt/* model: docker exec factory-litellm litellm --test --model chatgpt/gpt-5.3-codex
+#   3. LiteLLM prints a device code + URL in container logs
+#   4. Open URL on any device, enter code — token saved to chatgpt-tokens volume
+#   5. All subsequent calls use the cached token (auto-refreshes)
 #
 # Routing logic lives in code (workers/src/activities/llm.ts), not here.
-# This file configures the gateway; code decides which alias to call.
+# Langfuse callback: set LANGFUSE_PUBLIC_KEY + LANGFUSE_SECRET_KEY in .env after first login.
 #
-# Langfuse callback: wired once LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY
-# are set in .env (after first Langfuse login → Settings → API Keys).
-# Until then, LiteLLM operates without observability — set the keys before
-# running production workloads.
-#
-# To update models: change the `model:` values below. Aliases in code stay stable.
 # Anthropic models: https://docs.anthropic.com/en/docs/models-overview
 # OpenAI models:    https://platform.openai.com/docs/models
 
 model_list:
 
+  # ── ChatGPT subscription models (no API key — uses OAuth token) ──────────────
   - model_name: codex
+    model_info:
+      mode: responses
     litellm_params:
-      model: openai/codex-mini-latest
-      api_key: os.environ/OPENAI_API_KEY
+      model: chatgpt/gpt-5.3-codex
 
+  - model_name: gpt-large
+    model_info:
+      mode: responses
+    litellm_params:
+      model: chatgpt/gpt-5.4
+
+  - model_name: gpt-small
+    model_info:
+      mode: responses
+    litellm_params:
+      model: chatgpt/gpt-5.3-instant
+
+  # ── Anthropic models (requires ANTHROPIC_API_KEY in .env) ───────────────────
   - model_name: claude-opus
     litellm_params:
       model: anthropic/claude-opus-4-5
