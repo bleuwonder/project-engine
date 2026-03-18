@@ -188,6 +188,7 @@ services:
         condition: service_healthy
     environment:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY}
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/litellm
       LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
@@ -447,13 +448,6 @@ services:
       PROJECTS_ROOT: /workspace/projects
       GITHUB_TOKEN: ${GITHUB_TOKEN}
       GITHUB_REPO: ${GITHUB_REPO:-bleuwonder/project-engine}
-      # LLM_BACKEND=claude  → claude CLI + CLAUDE_CODE_OAUTH_TOKEN (Max plan, no API key needed)
-      # LLM_BACKEND=litellm → LiteLLM proxy + ANTHROPIC_API_KEY
-      LLM_BACKEND: ${LLM_BACKEND:-litellm}
-      CLAUDE_MODEL: ${CLAUDE_MODEL:-claude-sonnet-4-5}
-      # Max plan auth: generate once with `claude setup-token` on a browser-capable machine
-      # Token is valid 1 year. Add CLAUDE_CODE_OAUTH_TOKEN to /opt/project-engine/infra/.env
-      CLAUDE_CODE_OAUTH_TOKEN: ${CLAUDE_CODE_OAUTH_TOKEN:-}
     volumes:
       - ..:/workspace:rw
     networks:

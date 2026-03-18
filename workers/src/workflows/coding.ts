@@ -5,7 +5,7 @@ import type { writeRunFile } from '../activities/git.js'
 import type { upsertProject, insertRun } from '../activities/db-writes.js'
 import type { gitCreateBranch, gitCommitFiles, gitPushBranch } from '../activities/git-ops.js'
 import type { runTestSuite } from '../activities/test-runner.js'
-import type { claudeCodingAgent } from '../activities/claude-agent.js'
+import type { codingAgent } from '../activities/coding-agent.js'
 
 const { checkMetricsGate: metricsGate } =
   workflow.proxyActivities<{ checkMetricsGate: typeof checkMetricsGate }>({
@@ -36,8 +36,8 @@ const { runTestSuite: runTests } =
     startToCloseTimeout: '3m',
   })
 
-const { claudeCodingAgent: runCodingAgent } =
-  workflow.proxyActivities<{ claudeCodingAgent: typeof claudeCodingAgent }>({
+const { codingAgent: runCodingAgent } =
+  workflow.proxyActivities<{ codingAgent: typeof codingAgent }>({
     startToCloseTimeout: '10m',
     retry: { maximumAttempts: 2 },
   })

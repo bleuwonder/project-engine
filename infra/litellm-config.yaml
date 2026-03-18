@@ -2,7 +2,8 @@
 # LiteLLM Proxy — model routing, cost tracking, failover.
 #
 # Model aliases used in workers/src/activities/llm.ts:
-#   claude-opus    → anthropic/claude-opus-4-5   (complex tasks, never compromise)
+#   codex          → openai/codex-mini-latest     (code generation tasks)
+#   claude-opus    → anthropic/claude-opus-4-5    (complex tasks, never compromise)
 #   claude-sonnet  → anthropic/claude-sonnet-4-5  (balanced, safe default)
 #   claude-haiku   → anthropic/claude-3-5-haiku-20241022  (simple + meta-calls)
 #
@@ -15,9 +16,15 @@
 # running production workloads.
 #
 # To update models: change the `model:` values below. Aliases in code stay stable.
-# Check current model IDs: https://docs.anthropic.com/en/docs/models-overview
+# Anthropic models: https://docs.anthropic.com/en/docs/models-overview
+# OpenAI models:    https://platform.openai.com/docs/models
 
 model_list:
+
+  - model_name: codex
+    litellm_params:
+      model: openai/codex-mini-latest
+      api_key: os.environ/OPENAI_API_KEY
 
   - model_name: claude-opus
     litellm_params:
