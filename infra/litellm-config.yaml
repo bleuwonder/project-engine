@@ -47,9 +47,10 @@ model_list:
   # ── Local vLLM (Mistral 7B AWQ — no API cost, on-prem GPU) ─────────────────
   - model_name: mistral
     litellm_params:
-      model: hosted_vllm/solidrust/Mistral-7B-Instruct-v0.3-AWQ
+      model: openai/solidrust/Mistral-7B-Instruct-v0.3-AWQ
       api_base: http://vllm:8000/v1
-      request_timeout: 120
+      api_key: dummy
+      timeout: 120
 
   # ── Anthropic models (requires ANTHROPIC_API_KEY in .env) ───────────────────
   - model_name: claude-opus
