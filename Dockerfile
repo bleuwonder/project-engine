@@ -47,6 +47,8 @@ CMD ["node", "packages/db/dist/migrate.js"]
 # ── Target: factory-workers ──────────────────────────────────
 FROM node:22-slim AS factory-workers
 RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
+# Trust any mounted workspace volume — safe.directory required when host UID != container UID
+RUN git config --global --add safe.directory '*'
 WORKDIR /app
 
 COPY --from=builder /app/node_modules              ./node_modules
