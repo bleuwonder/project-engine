@@ -47,14 +47,20 @@ CMD ["node", "packages/db/dist/migrate.js"]
 # ── Target: factory-workers ──────────────────────────────────
 FROM node:22-slim AS factory-workers
 RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates && rm -rf /var/lib/apt/lists/*
-# Trust any mounted workspace volume — safe.directory required when host UID != container UID
-RUN git config --global --add safe.directory '*'
+# System-level git config so all users (root and node) trust mounted volumes
+RUN git config --system --add safe.directory '*' \
+ && git config --system user.email "factory-worker@project-engine" \
+ && git config --system user.name "Factory Worker"
 WORKDIR /app
+RUN chown node:node /app
 
-COPY --from=builder /app/node_modules              ./node_modules
-COPY --from=builder /app/packages/types            ./packages/types
-COPY --from=builder /app/packages/db               ./packages/db
-COPY --from=builder /app/workers                   ./workers
+COPY --from=builder --chown=node:node /app/node_modules              ./node_modules
+COPY --from=builder --chown=node:node /app/packages/types            ./packages/types
+COPY --from=builder --chown=node:node /app/packages/db               ./packages/db
+COPY --from=builder --chown=node:node /app/workers                   ./workers
+
+# Run as non-root — UID 1000 matches host user so bind-mount files have correct ownership
+USER node
 
 # Required env: TEMPORAL_ADDRESS, DATABASE_URL, WORKSPACE_ROOT
 CMD ["node", "workers/dist/worker.js"]
