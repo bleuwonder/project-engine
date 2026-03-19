@@ -46,6 +46,8 @@
 networks:
   factory-net:
     driver: bridge
+  internal:
+    external: true
 
 volumes:
   postgres-data:
@@ -211,6 +213,7 @@ services:
       start_period: 30s
     networks:
       - factory-net
+      - internal
 
   # ── ClickHouse 25.8 LTS ─────────────────────────────────────
   # Langfuse v3 stores all traces/observations/scores here (moved from Postgres for scale).
