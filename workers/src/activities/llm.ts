@@ -13,6 +13,7 @@ function litellm(): OpenAI {
 }
 
 function selectModel(task: TaskType, complexity: Complexity, cost: CostSignal): string {
+  if (process.env.MODEL_OVERRIDE) return process.env.MODEL_OVERRIDE
   if (task === 'code') return 'codex'
   if (cost === 'low' || complexity === 'simple') return 'claude-haiku'
   if (complexity === 'complex' && cost !== 'high') return 'claude-opus'
@@ -40,7 +41,7 @@ export async function routeToModel(
 export async function classifyComplexity(description: string): Promise<Complexity> {
   const prompt = `Classify the complexity of this task as exactly one word: simple, medium, or complex. Reply with only that word.\n\nTask: ${description}`
   const response = await litellm().chat.completions.create({
-    model: 'claude-haiku',
+    model: process.env.MODEL_OVERRIDE ?? 'claude-haiku',
     messages: [{ role: 'user', content: prompt }],
   })
   const raw = (response.choices[0]?.message?.content ?? '').trim().toLowerCase()

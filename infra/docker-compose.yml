@@ -456,6 +456,8 @@ services:
       PROJECTS_ROOT: /workspace/projects
       GITHUB_TOKEN: ${GITHUB_TOKEN}
       GITHUB_REPO: ${GITHUB_REPO:-bleuwonder/project-engine}
+      # Set to a LiteLLM model alias to force all calls to one model (useful for testing)
+      MODEL_OVERRIDE: ${MODEL_OVERRIDE:-}
     volumes:
       - ..:/workspace:rw
     networks:
