@@ -44,7 +44,7 @@ const { codingAgent: runCodingAgent } =
 
 export const currentStateQuery = workflow.defineQuery<CodingState>('currentState')
 
-export async function codingWorkflow(projectId: string, tasks: TaskItem[]): Promise<void> {
+export async function codingWorkflow(projectId: string, tasks: TaskItem[]): Promise<{ branchName: string, runId: string }> {
   const startedAt = new Date().toISOString()
   const workflowId = workflow.workflowInfo().workflowId
   const branchName = `project/${projectId}/coding/${workflowId.slice(-8)}`
@@ -128,4 +128,5 @@ export async function codingWorkflow(projectId: string, tasks: TaskItem[]): Prom
       : '',
   }
   await Promise.all([writeRun(projectId, runFile), dbInsertRun(runFile)])
+  return { branchName, runId }
 }

@@ -40,7 +40,7 @@ const { upsertProject: dbUpsertProject, insertRun: dbInsertRun } =
 export const approvePlanSignal = workflow.defineSignal<[]>('approvePlan')
 export const currentStateQuery = workflow.defineQuery<PlanningState>('currentState')
 
-export async function planningWorkflow(projectId: string): Promise<void> {
+export async function planningWorkflow(projectId: string): Promise<{ tasks: TaskItem[] }> {
   const startedAt = new Date().toISOString()
   const workflowId = workflow.workflowInfo().workflowId
 
@@ -125,4 +125,5 @@ export async function planningWorkflow(projectId: string): Promise<void> {
     gaps: '',
   }
   await Promise.all([writeRun(projectId, runFile), dbInsertRun(runFile)])
+  return { tasks: state.tasks }
 }

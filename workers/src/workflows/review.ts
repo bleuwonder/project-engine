@@ -50,7 +50,7 @@ export async function reviewWorkflow(
   projectId: string,
   branchName: string,
   codingRunId: string,
-): Promise<void> {
+): Promise<{ branchName: string, prNumber: number }> {
   const startedAt = new Date().toISOString()
   const workflowId = workflow.workflowInfo().workflowId
 
@@ -129,4 +129,5 @@ export async function reviewWorkflow(
     gaps: '',
   }
   await Promise.all([writeRun(projectId, runFile), dbInsertRun(runFile)])
+  return { branchName: state.branchName, prNumber: state.prNumber }
 }
