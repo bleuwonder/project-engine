@@ -40,12 +40,9 @@ const { upsertProject: dbUpsertProject, insertRun: dbInsertRun } =
 export const approvePlanSignal = workflow.defineSignal<[]>('approvePlan')
 export const currentStateQuery = workflow.defineQuery<PlanningState>('currentState')
 
-function isoNow(): string {
-  return new Date(workflow.workflowInfo().unsafe.now()).toISOString()
-}
 
 export async function planningWorkflow(projectId: string): Promise<{ tasks: TaskItem[] }> {
-  const startedAt = isoNow()
+  const startedAt = new Date().toISOString()
   const workflowId = workflow.workflowInfo().workflowId
 
   await metricsGate(projectId)
@@ -113,13 +110,13 @@ export async function planningWorkflow(projectId: string): Promise<{ tasks: Task
   // Wait for human approval (up to 7 days)
   await workflow.condition(() => state.approved, '7 days')
 
-  const runId = `${projectId}-planning-${workflow.workflowInfo().unsafe.now()}`
+  const runId = `${projectId}-planning-${Date.now()}`
   const runFile = {
     runId,
     workflowId,
     projectId,
     startedAt,
-    completedAt: isoNow(),
+    completedAt: new Date().toISOString(),
     status: 'complete' as const,
     agentsSpawned: 1,
     agentsCompleted: 1,

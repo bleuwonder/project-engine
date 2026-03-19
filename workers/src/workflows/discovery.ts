@@ -40,12 +40,9 @@ export const userMessageSignal = workflow.defineSignal<[string]>('userMessage')
 export const approvePlanSignal = workflow.defineSignal<[]>('approvePlan')
 export const currentStateQuery = workflow.defineQuery<DiscoveryState>('currentState')
 
-function isoNow(): string {
-  return new Date(workflow.workflowInfo().unsafe.now()).toISOString()
-}
 
 export async function DiscoveryWorkflow(projectId: string): Promise<void> {
-  const startedAt = isoNow()
+  const startedAt = new Date().toISOString()
   const workflowId = workflow.workflowInfo().workflowId
 
   // Message queue — signals push here, main loop processes
@@ -81,7 +78,7 @@ export async function DiscoveryWorkflow(projectId: string): Promise<void> {
     // Drain all pending messages (process the latest, acknowledge earlier ones)
     while (pendingMessages.length > 0) {
       const message = pendingMessages.shift()!
-      state.conversation.push({ role: 'human', content: message, timestamp: isoNow() })
+      state.conversation.push({ role: 'human', content: message, timestamp: new Date().toISOString() })
 
       const [ctx, cost] = await Promise.all([getContext(projectId), costSignal()])
       const systemPrompt = await buildPrompt(ctx)
@@ -91,7 +88,7 @@ export async function DiscoveryWorkflow(projectId: string): Promise<void> {
         .join('\n')
 
       const reply = await llm(conversationText, 'discovery', 'medium', cost, systemPrompt)
-      state.conversation.push({ role: 'agent', content: reply, timestamp: isoNow() })
+      state.conversation.push({ role: 'agent', content: reply, timestamp: new Date().toISOString() })
 
       try {
         await metricsGate(projectId)
@@ -107,13 +104,13 @@ export async function DiscoveryWorkflow(projectId: string): Promise<void> {
   state.currentPhase = 'complete'
   await dbUpsertProject(projectId, projectId, 'complete')
 
-  const runId = `${projectId}-discovery-${workflow.workflowInfo().unsafe.now()}`
+  const runId = `${projectId}-discovery-${Date.now()}`
   const runFile = {
     runId,
     workflowId,
     projectId,
     startedAt,
-    completedAt: isoNow(),
+    completedAt: new Date().toISOString(),
     status: 'complete' as const,
     agentsSpawned: 0,
     agentsCompleted: 0,

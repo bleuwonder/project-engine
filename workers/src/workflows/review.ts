@@ -46,16 +46,13 @@ const { createPullRequest: openPR } =
 export const approvePRSignal = workflow.defineSignal<[]>('approvePR')
 export const currentStateQuery = workflow.defineQuery<ReviewState>('currentState')
 
-function isoNow(): string {
-  return new Date(workflow.workflowInfo().unsafe.now()).toISOString()
-}
 
 export async function reviewWorkflow(
   projectId: string,
   branchName: string,
   codingRunId: string,
 ): Promise<{ branchName: string, prNumber: number }> {
-  const startedAt = isoNow()
+  const startedAt = new Date().toISOString()
   const workflowId = workflow.workflowInfo().workflowId
 
   await metricsGate(projectId)
@@ -117,13 +114,13 @@ export async function reviewWorkflow(
   // Wait for human to approve PR (7 days)
   await workflow.condition(() => state.approved, '7 days')
 
-  const runId = `${projectId}-review-${workflow.workflowInfo().unsafe.now()}`
+  const runId = `${projectId}-review-${Date.now()}`
   const runFile = {
     runId,
     workflowId,
     projectId,
     startedAt,
-    completedAt: isoNow(),
+    completedAt: new Date().toISOString(),
     status: 'complete' as const,
     agentsSpawned: 1,
     agentsCompleted: 1,

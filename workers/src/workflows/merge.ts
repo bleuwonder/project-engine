@@ -36,16 +36,13 @@ const { gitCheckoutMain: checkoutMain } =
 
 export const currentStateQuery = workflow.defineQuery<MergeState>('currentState')
 
-function isoNow(): string {
-  return new Date(workflow.workflowInfo().unsafe.now()).toISOString()
-}
 
 export async function mergeWorkflow(
   projectId: string,
   branchName: string,
   prNumber: number,
 ): Promise<void> {
-  const startedAt = isoNow()
+  const startedAt = new Date().toISOString()
   const workflowId = workflow.workflowInfo().workflowId
 
   await metricsGate(projectId)
@@ -67,7 +64,7 @@ export async function mergeWorkflow(
     `# Status — ${projectId}`,
     '',
     `**Phase:** complete`,
-    `**Last merged:** ${isoNow().slice(0, 10)}`,
+    `**Last merged:** ${new Date().toISOString().slice(0, 10)}`,
     `**Branch merged:** \`${branchName}\``,
     `**PR #:** ${prNumber}`,
     '',
@@ -79,13 +76,13 @@ export async function mergeWorkflow(
   await checkoutMain()
   await dbUpsertProject(projectId, projectId, 'complete')
 
-  const runId = `${projectId}-merge-${workflow.workflowInfo().unsafe.now()}`
+  const runId = `${projectId}-merge-${Date.now()}`
   const runFile = {
     runId,
     workflowId,
     projectId,
     startedAt,
-    completedAt: isoNow(),
+    completedAt: new Date().toISOString(),
     status: 'complete' as const,
     agentsSpawned: 0,
     agentsCompleted: 0,
