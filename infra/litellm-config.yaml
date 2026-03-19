@@ -2,7 +2,7 @@
 # LiteLLM Proxy — model routing, cost tracking, failover.
 #
 # Model aliases used in workers/src/activities/llm.ts:
-#   mistral        → vllm/Mistral-7B-AWQ           (local GPU — zero cost, via Traefik)
+#   mistral        → hosted_vllm/Mistral-7B-AWQ     (local GPU — zero cost, direct Docker network)
 #   codex          → chatgpt/gpt-5.3-codex        (code gen — ChatGPT subscription, no API cost)
 #   gpt-large      → chatgpt/gpt-5.4              (general large — ChatGPT subscription)
 #   gpt-small      → chatgpt/gpt-5.3-instant      (fast/cheap — ChatGPT subscription)
@@ -47,9 +47,8 @@ model_list:
   # ── Local vLLM (Mistral 7B AWQ — no API cost, on-prem GPU) ─────────────────
   - model_name: mistral
     litellm_params:
-      model: openai/solidrust/Mistral-7B-Instruct-v0.3-AWQ
-      api_base: http://vllm:8000/v1
-      api_key: dummy
+      model: hosted_vllm/solidrust/Mistral-7B-Instruct-v0.3-AWQ
+      api_base: http://vllm:8000
       request_timeout: 120
 
   # ── Anthropic models (requires ANTHROPIC_API_KEY in .env) ───────────────────
