@@ -1,9 +1,17 @@
-import type { DiscoveryState } from '@factory/types'
+import type { DiscoveryState, ReviewState, CodingState } from '@factory/types'
 
 export const dynamic = 'force-dynamic'
 
 interface Props {
   params: Promise<{ id: string }>
+}
+
+interface ProjectRow {
+  id: string
+  name: string
+  phase: string
+  active_workflow_id: string | null
+  updated_at: string
 }
 
 interface RunRow {
@@ -25,14 +33,23 @@ const STATUS_COLOR: Record<string, string> = {
   running: '#3b82f6',
 }
 
-async function getProjectWorkflow(
-  projectId: string,
-): Promise<{ workflowId: string; state: DiscoveryState } | null> {
+const PHASE_COLOR: Record<string, string> = {
+  discovery: '#3b82f6',
+  planning: '#8b5cf6',
+  building: '#f59e0b',
+  coding: '#f59e0b',
+  review: '#06b6d4',
+  merge: '#06b6d4',
+  complete: '#10b981',
+  failed: '#ef4444',
+}
+
+async function getProject(id: string): Promise<ProjectRow | null> {
   const base = process.env.NEXT_PUBLIC_BASE_URL ?? 'http://localhost:3100'
-  const res = await fetch(`${base}/api/workflows`, { next: { revalidate: 5 } })
+  const res = await fetch(`${base}/api/projects`, { next: { revalidate: 5 } })
   if (!res.ok) return null
-  const workflows: Array<{ workflowId: string; state: DiscoveryState }> = await res.json()
-  return workflows.find(wf => wf.state.projectId === projectId) ?? null
+  const projects: ProjectRow[] = await res.json()
+  return projects.find(p => p.id === id) ?? null
 }
 
 async function getRuns(projectId: string): Promise<RunRow[]> {
@@ -42,9 +59,24 @@ async function getRuns(projectId: string): Promise<RunRow[]> {
   return res.json()
 }
 
+async function getLiveState(projectId: string): Promise<{
+  discovery?: DiscoveryState
+  coding?: CodingState
+  review?: ReviewState
+} | null> {
+  const base = process.env.NEXT_PUBLIC_BASE_URL ?? 'http://localhost:3100'
+  const res = await fetch(`${base}/api/state/${projectId}`, { next: { revalidate: 5 } })
+  if (!res.ok) return null
+  return res.json()
+}
+
 export default async function ProjectPage({ params }: Props) {
   const { id } = await params
-  const [entry, runs] = await Promise.all([getProjectWorkflow(id), getRuns(id)])
+  const [project, runs, live] = await Promise.all([
+    getProject(id),
+    getRuns(id),
+    getLiveState(id),
+  ])
 
   const totalCost = runs.reduce((sum, r) => sum + parseFloat(r.cost_usd ?? '0'), 0)
 
@@ -53,20 +85,64 @@ export default async function ProjectPage({ params }: Props) {
       <a href="/" style={{ color: '#6b7280', textDecoration: 'none' }}>← back</a>
       <h1 style={{ marginTop: '1rem', marginBottom: '0.25rem' }}>{id}</h1>
 
-      {entry && (
+      {project && (
         <p style={{ color: '#6b7280', fontSize: '0.85rem', marginBottom: '2rem' }}>
-          {entry.workflowId} · phase: {entry.state.currentPhase} ·{' '}
-          {entry.state.hasMetrics ? '✓ metrics' : '⚠ no metrics'} ·{' '}
-          {entry.state.approved ? '✓ approved' : 'awaiting approval'}
+          phase:{' '}
+          <span style={{ color: PHASE_COLOR[project.phase] ?? '#6b7280' }}>
+            {project.phase}
+          </span>
+          {' · '}updated {new Date(project.updated_at).toLocaleString()}
         </p>
       )}
 
-      {/* Conversation */}
-      {entry && entry.state.conversation.length > 0 && (
+      {/* Live coding state */}
+      {live?.coding && (
+        <section style={{ marginBottom: '2rem' }}>
+          <h2 style={{ fontSize: '1rem', marginBottom: '0.75rem' }}>Coding progress</h2>
+          <div style={{ color: '#6b7280', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
+            Branch: <code>{live.coding.branchName}</code> · Task {live.coding.currentTaskIndex + 1}/{live.coding.tasks.length}
+            {live.coding.testsPassed ? ' · ✓ tests passed' : ''}
+          </div>
+          {live.coding.tasks.map((t, i) => (
+            <div key={t.id} style={{
+              padding: '0.5rem 0.75rem',
+              borderLeft: `3px solid ${t.status === 'done' ? '#10b981' : t.status === 'in_progress' ? '#3b82f6' : t.status === 'failed' ? '#ef4444' : '#374151'}`,
+              marginBottom: '0.25rem',
+              fontSize: '0.85rem',
+            }}>
+              <span style={{ color: '#6b7280' }}>{i + 1}.</span> {t.description}
+              <span style={{ color: '#6b7280', marginLeft: '0.5rem' }}>[{t.status}]</span>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {/* Live review state */}
+      {live?.review && (
+        <section style={{ marginBottom: '2rem' }}>
+          <h2 style={{ fontSize: '1rem', marginBottom: '0.75rem' }}>Review</h2>
+          <div style={{ color: '#6b7280', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
+            {live.review.prUrl ? (
+              <a href={live.review.prUrl} target="_blank" rel="noreferrer" style={{ color: '#3b82f6' }}>
+                PR #{live.review.prNumber}
+              </a>
+            ) : 'PR not yet created'}
+            {live.review.approved ? ' · ✓ approved' : ' · awaiting approval'}
+          </div>
+          {live.review.findings && (
+            <pre style={{ background: '#1e293b', padding: '1rem', borderRadius: '6px', fontSize: '0.8rem', whiteSpace: 'pre-wrap', maxHeight: '300px', overflow: 'auto' }}>
+              {live.review.findings}
+            </pre>
+          )}
+        </section>
+      )}
+
+      {/* Discovery conversation */}
+      {live?.discovery && live.discovery.conversation.length > 0 && (
         <section style={{ marginBottom: '2rem' }}>
           <h2 style={{ fontSize: '1rem', marginBottom: '0.75rem' }}>Discovery conversation</h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            {entry.state.conversation.map((msg, i) => (
+            {live.discovery.conversation.map((msg, i) => (
               <div
                 key={i}
                 style={{

@@ -46,6 +46,10 @@ model_list:
 
   # ── Local vLLM (Mistral 7B AWQ — no API cost, on-prem GPU) ─────────────────
   - model_name: mistral
+    model_info:
+      # Mistral parallel tool template doesn't handle system role — LiteLLM
+      # will prepend system content to the first user message instead.
+      supports_system_message: false
     litellm_params:
       model: openai/solidrust/Mistral-7B-Instruct-v0.3-AWQ
       api_base: http://vllm:8000/v1

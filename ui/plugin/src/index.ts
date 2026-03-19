@@ -13,107 +13,121 @@ async function getClient(): Promise<Client> {
   return _client
 }
 
+// ── Primary: ProjectWorkflow orchestrator ──────────────────────
+
 export async function startProject(projectId: string): Promise<string> {
   const client = await getClient()
-  const handle = await client.workflow.start('DiscoveryWorkflow', {
+  const handle = await client.workflow.start('ProjectWorkflow', {
     taskQueue: 'factory',
-    workflowId: `project-${projectId}-discovery`,
+    workflowId: projectId,
     args: [projectId],
   })
   return handle.workflowId
 }
 
-export async function sendMessage(workflowId: string, message: string): Promise<void> {
-  const client = await getClient()
-  await client.workflow.getHandle(workflowId).signal('userMessage', message)
+export interface ProjectState {
+  projectId: string
+  phase: 'discovery' | 'planning' | 'coding' | 'review' | 'merge' | 'complete'
+  childIds: {
+    discovery: string
+    planning: string
+    coding: string
+    review: string
+    merge: string
+  }
 }
 
-export async function approvePlan(workflowId: string): Promise<void> {
+export async function getProjectState(projectId: string): Promise<ProjectState> {
   const client = await getClient()
-  await client.workflow.getHandle(workflowId).signal('approvePlan')
+  return client.workflow.getHandle(projectId).query<ProjectState>('projectState')
 }
 
-export async function getState(workflowId: string): Promise<DiscoveryState> {
+// ── Signals (sent to child workflows by deterministic ID) ──────
+
+export async function sendMessage(projectId: string, message: string): Promise<void> {
   const client = await getClient()
-  return client.workflow.getHandle(workflowId).query<DiscoveryState>('currentState')
+  await client.workflow.getHandle(`${projectId}-discovery`).signal('userMessage', message)
 }
 
-// ── Phase 1: Planning ────────────────────────────────────────
+export async function approvePlan(projectId: string): Promise<void> {
+  const client = await getClient()
+  await client.workflow.getHandle(`${projectId}-discovery`).signal('approvePlan')
+}
+
+export async function approvePR(projectId: string): Promise<void> {
+  const client = await getClient()
+  await client.workflow.getHandle(`${projectId}-review`).signal('approvePR')
+}
+
+// ── Child workflow state queries ───────────────────────────────
+
+export async function getDiscoveryState(projectId: string): Promise<DiscoveryState> {
+  const client = await getClient()
+  return client.workflow.getHandle(`${projectId}-discovery`).query<DiscoveryState>('currentState')
+}
+
+export async function getPlanningState(projectId: string): Promise<PlanningState> {
+  const client = await getClient()
+  return client.workflow.getHandle(`${projectId}-planning`).query<PlanningState>('currentState')
+}
+
+export async function getCodingState(projectId: string): Promise<CodingState> {
+  const client = await getClient()
+  return client.workflow.getHandle(`${projectId}-coding`).query<CodingState>('currentState')
+}
+
+export async function getReviewState(projectId: string): Promise<ReviewState> {
+  const client = await getClient()
+  return client.workflow.getHandle(`${projectId}-review`).query<ReviewState>('currentState')
+}
+
+// ── Standalone phase starts (debugging / manual re-runs) ───────
+
+export async function startDiscovery(projectId: string): Promise<string> {
+  const client = await getClient()
+  const handle = await client.workflow.start('DiscoveryWorkflow', {
+    taskQueue: 'factory',
+    workflowId: `${projectId}-discovery-${Date.now()}`,
+    args: [projectId],
+  })
+  return handle.workflowId
+}
 
 export async function startPlanning(projectId: string): Promise<string> {
   const client = await getClient()
   const handle = await client.workflow.start('planningWorkflow', {
     taskQueue: 'factory',
-    workflowId: `project-${projectId}-planning-${Date.now()}`,
+    workflowId: `${projectId}-planning-${Date.now()}`,
     args: [projectId],
   })
   return handle.workflowId
 }
 
-export async function approvePlanningPlan(workflowId: string): Promise<void> {
-  const client = await getClient()
-  await client.workflow.getHandle(workflowId).signal('approvePlan')
-}
-
-export async function getPlanningState(workflowId: string): Promise<PlanningState> {
-  const client = await getClient()
-  return client.workflow.getHandle(workflowId).query<PlanningState>('currentState')
-}
-
-// ── Phase 1: Coding ──────────────────────────────────────────
-
 export async function startCoding(projectId: string, tasks: TaskItem[]): Promise<string> {
   const client = await getClient()
   const handle = await client.workflow.start('codingWorkflow', {
     taskQueue: 'factory',
-    workflowId: `project-${projectId}-coding-${Date.now()}`,
+    workflowId: `${projectId}-coding-${Date.now()}`,
     args: [projectId, tasks],
   })
   return handle.workflowId
 }
 
-export async function getCodingState(workflowId: string): Promise<CodingState> {
-  const client = await getClient()
-  return client.workflow.getHandle(workflowId).query<CodingState>('currentState')
-}
-
-// ── Phase 1: Review ──────────────────────────────────────────
-
-export async function startReview(
-  projectId: string,
-  branchName: string,
-  codingRunId: string,
-): Promise<string> {
+export async function startReview(projectId: string, branchName: string, codingRunId: string): Promise<string> {
   const client = await getClient()
   const handle = await client.workflow.start('reviewWorkflow', {
     taskQueue: 'factory',
-    workflowId: `project-${projectId}-review-${Date.now()}`,
+    workflowId: `${projectId}-review-${Date.now()}`,
     args: [projectId, branchName, codingRunId],
   })
   return handle.workflowId
 }
 
-export async function approvePR(workflowId: string): Promise<void> {
-  const client = await getClient()
-  await client.workflow.getHandle(workflowId).signal('approvePR')
-}
-
-export async function getReviewState(workflowId: string): Promise<ReviewState> {
-  const client = await getClient()
-  return client.workflow.getHandle(workflowId).query<ReviewState>('currentState')
-}
-
-// ── Phase 1: Merge ───────────────────────────────────────────
-
-export async function startMerge(
-  projectId: string,
-  branchName: string,
-  prNumber: number,
-): Promise<string> {
+export async function startMerge(projectId: string, branchName: string, prNumber: number): Promise<string> {
   const client = await getClient()
   const handle = await client.workflow.start('mergeWorkflow', {
     taskQueue: 'factory',
-    workflowId: `project-${projectId}-merge-${Date.now()}`,
+    workflowId: `${projectId}-merge-${Date.now()}`,
     args: [projectId, branchName, prNumber],
   })
   return handle.workflowId
