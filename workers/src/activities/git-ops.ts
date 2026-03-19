@@ -4,12 +4,16 @@ import { join } from 'path'
 const WORKSPACE = process.env.WORKSPACE_ROOT ?? join(process.cwd(), '..', '..')
 
 function git() {
-  return simpleGit(WORKSPACE, {
-    config: [
-      'user.name=factory-bot',
-      'user.email=factory-bot@bleuwonder.io',
-    ],
-  })
+  const token = process.env.GITHUB_TOKEN
+  const config = [
+    'user.name=factory-bot',
+    'user.email=factory-bot@bleuwonder.io',
+  ]
+  // Configure credential helper to inject token without exposing it in URLs
+  if (token) {
+    config.push(`credential.helper=!f() { echo "password=${token}"; echo "username=x-access-token"; }; f`)
+  }
+  return simpleGit(WORKSPACE, { config })
 }
 
 export async function gitCreateBranch(branchName: string): Promise<void> {
@@ -28,10 +32,9 @@ export async function gitCommitFiles(message: string, files: string[]): Promise<
 }
 
 export async function gitPushBranch(branchName: string): Promise<void> {
-  const token = process.env.GITHUB_TOKEN
+  if (!process.env.GITHUB_TOKEN) throw new Error('GITHUB_TOKEN not set')
   const repo = process.env.GITHUB_REPO ?? 'bleuwonder/project-engine'
-  if (!token) throw new Error('GITHUB_TOKEN not set')
-  await git().push(`https://${token}@github.com/${repo}.git`, branchName)
+  await git().push(`https://github.com/${repo}.git`, branchName)
 }
 
 export async function gitCurrentBranch(): Promise<string> {

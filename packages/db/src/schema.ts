@@ -60,5 +60,9 @@ export async function migrate(): Promise<void> {
     ON embeddings USING ivfflat (embedding vector_cosine_ops)
   `
 
+  await sql`CREATE INDEX IF NOT EXISTS runs_project_id_idx ON runs(project_id)`
+  await sql`CREATE INDEX IF NOT EXISTS runs_started_at_idx ON runs(started_at DESC)`
+  await sql`CREATE INDEX IF NOT EXISTS agent_results_run_id_idx ON agent_results(run_id)`
+
   console.log('Migration complete')
 }

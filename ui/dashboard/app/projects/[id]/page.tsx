@@ -44,17 +44,17 @@ const PHASE_COLOR: Record<string, string> = {
   failed: '#ef4444',
 }
 
+const INTERNAL_BASE = `http://localhost:${process.env.PORT ?? '3100'}`
+
 async function getProject(id: string): Promise<ProjectRow | null> {
-  const base = process.env.NEXT_PUBLIC_BASE_URL ?? 'http://localhost:3100'
-  const res = await fetch(`${base}/api/projects`, { next: { revalidate: 5 } })
+  const res = await fetch(`${INTERNAL_BASE}/api/projects`, { next: { revalidate: 5 } })
   if (!res.ok) return null
   const projects: ProjectRow[] = await res.json()
   return projects.find(p => p.id === id) ?? null
 }
 
 async function getRuns(projectId: string): Promise<RunRow[]> {
-  const base = process.env.NEXT_PUBLIC_BASE_URL ?? 'http://localhost:3100'
-  const res = await fetch(`${base}/api/runs/${projectId}`, { next: { revalidate: 5 } })
+  const res = await fetch(`${INTERNAL_BASE}/api/runs/${projectId}`, { next: { revalidate: 5 } })
   if (!res.ok) return []
   return res.json()
 }
@@ -64,8 +64,7 @@ async function getLiveState(projectId: string): Promise<{
   coding?: CodingState
   review?: ReviewState
 } | null> {
-  const base = process.env.NEXT_PUBLIC_BASE_URL ?? 'http://localhost:3100'
-  const res = await fetch(`${base}/api/state/${projectId}`, { next: { revalidate: 5 } })
+  const res = await fetch(`${INTERNAL_BASE}/api/state/${projectId}`, { next: { revalidate: 5 } })
   if (!res.ok) return null
   return res.json()
 }

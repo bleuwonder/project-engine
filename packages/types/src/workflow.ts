@@ -3,6 +3,7 @@ export type WorkflowPhase =
   | 'planning'
   | 'building'
   | 'review'
+  | 'merge'
   | 'complete'
   | 'failed'
 

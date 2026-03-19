@@ -7,7 +7,6 @@ import type { checkMetricsGate } from '../activities/metrics-gate.js'
 import type { writeRunFile } from '../activities/git.js'
 import type { upsertProject, insertRun } from '../activities/db-writes.js'
 
-// Activity proxies — deterministic wrappers, all I/O goes through activities
 const { prepareAgentContext: getContext, buildSystemPrompt: buildPrompt } =
   workflow.proxyActivities<{
     prepareAgentContext: typeof prepareAgentContext
@@ -37,16 +36,20 @@ const { upsertProject: dbUpsertProject, insertRun: dbInsertRun } =
     insertRun: typeof insertRun
   }>({ startToCloseTimeout: '15s' })
 
-// Signals
 export const userMessageSignal = workflow.defineSignal<[string]>('userMessage')
 export const approvePlanSignal = workflow.defineSignal<[]>('approvePlan')
-
-// Queries
 export const currentStateQuery = workflow.defineQuery<DiscoveryState>('currentState')
 
+function isoNow(): string {
+  return new Date(workflow.workflowInfo().unsafe.now()).toISOString()
+}
+
 export async function DiscoveryWorkflow(projectId: string): Promise<void> {
-  const startedAt = new Date().toISOString()
+  const startedAt = isoNow()
   const workflowId = workflow.workflowInfo().workflowId
+
+  // Message queue — signals push here, main loop processes
+  const pendingMessages: string[] = []
 
   const state: DiscoveryState = {
     projectId,
@@ -58,26 +61,9 @@ export async function DiscoveryWorkflow(projectId: string): Promise<void> {
 
   workflow.setHandler(currentStateQuery, () => state)
 
-  workflow.setHandler(userMessageSignal, async (message: string) => {
-    state.conversation.push({ role: 'human', content: message, timestamp: new Date().toISOString() })
-
-    const [ctx, cost] = await Promise.all([getContext(projectId), costSignal()])
-    const systemPrompt = await buildPrompt(ctx)
-
-    const conversationText = state.conversation
-      .map(m => `${m.role === 'human' ? 'Human' : 'Agent'}: ${m.content}`)
-      .join('\n')
-
-    const reply = await llm(conversationText, 'discovery', 'medium', cost, systemPrompt)
-    state.conversation.push({ role: 'agent', content: reply, timestamp: new Date().toISOString() })
-
-    // Check if GOALS.md now has a measurable metric (non-blocking — just update state)
-    try {
-      await metricsGate(projectId)
-      state.hasMetrics = true
-    } catch {
-      state.hasMetrics = false
-    }
+  // Signals: synchronous state mutation only
+  workflow.setHandler(userMessageSignal, (message: string) => {
+    pendingMessages.push(message)
   })
 
   workflow.setHandler(approvePlanSignal, () => {
@@ -86,22 +72,48 @@ export async function DiscoveryWorkflow(projectId: string): Promise<void> {
 
   await dbUpsertProject(projectId, projectId, 'discovery', workflowId)
 
-  // Wait for human approval (up to 7 days)
-  await workflow.condition(() => state.approved, '7 days')
+  // Main loop: process messages until approved or timeout
+  while (!state.approved) {
+    // Wait for a new message or approval
+    await workflow.condition(() => pendingMessages.length > 0 || state.approved, '7 days')
+    if (state.approved) break
 
-  // Final metrics gate — blocks completion if no measurable metric
+    // Drain all pending messages (process the latest, acknowledge earlier ones)
+    while (pendingMessages.length > 0) {
+      const message = pendingMessages.shift()!
+      state.conversation.push({ role: 'human', content: message, timestamp: isoNow() })
+
+      const [ctx, cost] = await Promise.all([getContext(projectId), costSignal()])
+      const systemPrompt = await buildPrompt(ctx)
+
+      const conversationText = state.conversation
+        .map(m => `${m.role === 'human' ? 'Human' : 'Agent'}: ${m.content}`)
+        .join('\n')
+
+      const reply = await llm(conversationText, 'discovery', 'medium', cost, systemPrompt)
+      state.conversation.push({ role: 'agent', content: reply, timestamp: isoNow() })
+
+      try {
+        await metricsGate(projectId)
+        state.hasMetrics = true
+      } catch {
+        state.hasMetrics = false
+      }
+    }
+  }
+
   await metricsGate(projectId)
 
   state.currentPhase = 'complete'
   await dbUpsertProject(projectId, projectId, 'complete')
 
-  const runId = `${projectId}-discovery-${Date.now()}`
+  const runId = `${projectId}-discovery-${workflow.workflowInfo().unsafe.now()}`
   const runFile = {
     runId,
     workflowId,
     projectId,
     startedAt,
-    completedAt: new Date().toISOString(),
+    completedAt: isoNow(),
     status: 'complete' as const,
     agentsSpawned: 0,
     agentsCompleted: 0,

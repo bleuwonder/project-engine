@@ -44,8 +44,12 @@ const { codingAgent: runCodingAgent } =
 
 export const currentStateQuery = workflow.defineQuery<CodingState>('currentState')
 
+function isoNow(): string {
+  return new Date(workflow.workflowInfo().unsafe.now()).toISOString()
+}
+
 export async function codingWorkflow(projectId: string, tasks: TaskItem[]): Promise<{ branchName: string, runId: string }> {
-  const startedAt = new Date().toISOString()
+  const startedAt = isoNow()
   const workflowId = workflow.workflowInfo().workflowId
   const branchName = `project/${projectId}/coding/${workflowId.slice(-8)}`
 
@@ -110,13 +114,13 @@ export async function codingWorkflow(projectId: string, tasks: TaskItem[]): Prom
     : agentsCompleted > 0 ? 'partial_failure' as const
     : 'failed' as const
 
-  const runId = `${projectId}-coding-${Date.now()}`
+  const runId = `${projectId}-coding-${workflow.workflowInfo().unsafe.now()}`
   const runFile = {
     runId,
     workflowId,
     projectId,
     startedAt,
-    completedAt: new Date().toISOString(),
+    completedAt: isoNow(),
     status: runStatus,
     agentsSpawned: state.tasks.length,
     agentsCompleted,

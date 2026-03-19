@@ -1,19 +1,8 @@
-import OpenAI from 'openai'
 import { writeFileSync, mkdirSync } from 'fs'
 import { join, dirname } from 'path'
+import { litellm } from './litellm-client.js'
 
 const PROJECTS_ROOT = process.env.PROJECTS_ROOT ?? '/workspace/projects'
-
-let _client: OpenAI | null = null
-function litellm(): OpenAI {
-  if (!_client) {
-    _client = new OpenAI({
-      baseURL: process.env.LITELLM_URL ?? 'http://localhost:4000',
-      apiKey: process.env.LITELLM_MASTER_KEY ?? 'sk-factory',
-    })
-  }
-  return _client
-}
 
 export async function codingAgent(
   projectId: string,
@@ -40,10 +29,11 @@ export async function codingAgent(
       ].join('\n\n')
 
   const response = await litellm().chat.completions.create({
-    model: 'codex',
+    model: process.env.MODEL_OVERRIDE ?? 'codex',
     messages: [{ role: 'user', content: prompt }],
   })
-  const code = response.choices[0]?.message?.content ?? ''
+  const code = response.choices[0]?.message?.content
+  if (!code) throw new Error(`Empty response from coding model for task: ${task}`)
 
   if (isSingle) {
     const filePath = join(workDir, outputFiles[0])

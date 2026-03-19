@@ -1,16 +1,5 @@
-import OpenAI from 'openai'
 import type { CostSignal, Complexity, TaskType } from '@factory/types'
-
-let _client: OpenAI | null = null
-function litellm(): OpenAI {
-  if (!_client) {
-    _client = new OpenAI({
-      baseURL: process.env.LITELLM_URL ?? 'http://localhost:4000',
-      apiKey: process.env.LITELLM_MASTER_KEY ?? 'sk-factory',
-    })
-  }
-  return _client
-}
+import { litellm } from './litellm-client.js'
 
 function selectModel(task: TaskType, complexity: Complexity, cost: CostSignal): string {
   if (process.env.MODEL_OVERRIDE) return process.env.MODEL_OVERRIDE
@@ -35,7 +24,9 @@ export async function routeToModel(
       { role: 'user', content: prompt },
     ],
   })
-  return response.choices[0]?.message?.content ?? ''
+  const content = response.choices[0]?.message?.content
+  if (!content) throw new Error(`Empty response from model ${model}`)
+  return content
 }
 
 export async function classifyComplexity(description: string): Promise<Complexity> {

@@ -23,9 +23,10 @@ const PHASE_COLOR: Record<string, string> = {
   failed: '#ef4444',
 }
 
+const INTERNAL_BASE = `http://localhost:${process.env.PORT ?? '3100'}`
+
 async function getProjects(): Promise<ProjectRow[]> {
-  const base = process.env.NEXT_PUBLIC_BASE_URL ?? 'http://localhost:3100'
-  const res = await fetch(`${base}/api/projects`, { next: { revalidate: 5 } })
+  const res = await fetch(`${INTERNAL_BASE}/api/projects`, { next: { revalidate: 5 } })
   if (!res.ok) return []
   return res.json()
 }
