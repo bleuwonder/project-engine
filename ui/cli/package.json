@@ -1,0 +1,16 @@
+{
+  "name": "@factory/cli",
+  "version": "0.0.1",
+  "type": "module",
+  "bin": {
+    "factory": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@temporalio/client": "^1.11.5",
+    "commander": "^13.1.0"
+  }
+}

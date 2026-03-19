@@ -1,4 +1,5 @@
 import type { DiscoveryState, ReviewState, CodingState } from '@factory/types'
+import ProjectActions from '../../components/ProjectActions'
 
 export const dynamic = 'force-dynamic'
 
@@ -92,6 +93,16 @@ export default async function ProjectPage({ params }: Props) {
           </span>
           {' · '}updated {new Date(project.updated_at).toLocaleString()}
         </p>
+      )}
+
+      {/* Actions */}
+      {project && (
+        <ProjectActions
+          projectId={id}
+          phase={project.phase}
+          discoveryApproved={live?.discovery?.approved}
+          reviewApproved={live?.review?.approved}
+        />
       )}
 
       {/* Live coding state */}

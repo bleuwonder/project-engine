@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import StartProjectForm from './components/StartProjectForm'
 
 export const dynamic = 'force-dynamic'
 
@@ -43,8 +44,10 @@ export default async function Dashboard() {
         {active.length} active · {done.length} completed
       </p>
 
+      <StartProjectForm />
+
       {projects.length === 0 && (
-        <p style={{ color: '#6b7280' }}>No projects yet. Start one via the plugin.</p>
+        <p style={{ color: '#6b7280' }}>No projects yet. Start one above.</p>
       )}
 
       {active.length > 0 && (

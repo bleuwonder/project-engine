@@ -5,7 +5,8 @@
     "packages/*",
     "workers",
     "ui/plugin",
-    "ui/dashboard"
+    "ui/dashboard",
+    "ui/cli"
   ],
   "scripts": {
     "build": "npm run build -w @factory/types && npm run build -w @factory/db && npm run build -w workers && npm run build -w @factory/dashboard",
